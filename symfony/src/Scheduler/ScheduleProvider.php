@@ -18,7 +18,7 @@ class ScheduleProvider implements ScheduleProviderInterface
         return (new Schedule())->add(
             RecurringMessage::every(3600, new FuelMessage()),
             RecurringMessage::every(100, new SolarMessage()),
-            RecurringMessage::every(240, new ThermorMessage()),
+            RecurringMessage::every(120, new ThermorMessage()),
         );
     }
 }
