@@ -16,9 +16,9 @@ class ScheduleProvider implements ScheduleProviderInterface
     public function getSchedule(): Schedule
     {
         return (new Schedule())->add(
-            RecurringMessage::every('3600 seconds', new FuelMessage()),
-            RecurringMessage::every('100 seconds', new SolarMessage()),
-            RecurringMessage::every('240 seconds', new ThermorMessage()),
+            RecurringMessage::every(3600, new FuelMessage()),
+            RecurringMessage::every(100, new SolarMessage()),
+            RecurringMessage::every(240, new ThermorMessage()),
         );
     }
 }
