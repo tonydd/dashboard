@@ -1,0 +1,74 @@
+@import './base.css';
+
+
+body {
+  color: white;
+  background-color: #181818;
+  max-width: 1280px;
+  max-height: 800px;
+}
+
+#app {
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 2rem;
+  font-weight: normal;
+}
+
+a,
+.green {
+  text-decoration: none;
+  color: hsla(160, 100%, 37%, 1);
+  transition: 0.4s;
+  padding: 3px;
+}
+
+@media (hover: hover) {
+  a:hover {
+    background-color: hsla(160, 100%, 37%, 0.2);
+  }
+}
+
+/*@media (min-width: 1024px) {*/
+/*  body {*/
+/*    display: flex;*/
+/*    place-items: center;*/
+/*  }*/
+
+/*  #app {*/
+/*    display: grid;*/
+/*    grid-template-columns: 1fr 1fr;*/
+/*    padding: 0 2rem;*/
+/*  }*/
+/*}*/
+
+.row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  flex-basis: 100%;
+  flex: 1;
+}
+
+.flex-center-vertical {
+    align-items: center;
+}
+
+.flex-center-horizontal {
+    justify-content: center;
+}
+
+.pad-right-20 {
+    padding-right: 20px;
+}
+
+.pad-left-20 {
+    padding-left: 20px;
+}
+

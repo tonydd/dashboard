@@ -1,0 +1,4 @@
+# config/packages/scheduler.yaml
+framework:
+  scheduler:
+    enabled: true  # Assurez-vous que le scheduler est activé

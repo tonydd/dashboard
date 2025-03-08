@@ -1,0 +1,157 @@
+[
+  {
+    "id": 1,
+    "code": "BURGER_MAISON",
+    "name": "Burger maison",
+    "description": "Un burger maison savoureux, facile à préparer, avec des ingrédients simples.",
+    "preparationTime": 20,
+    "cookingTime": 10,
+    "restingTime": 0,
+    "servings": 4,
+    "difficulty": {
+      "id": 1,
+      "name": "Facile",
+      "code": "FACILE"
+    },
+    "ingredients": [
+      {
+        "code": "PAIN_BURGER",
+        "ingredient": {
+          "id": 1,
+          "name": "Pain à burger",
+          "code": "PAIN_BURGER",
+          "image": null
+        },
+        "quantity": 4,
+        "unit": {
+          "id": 1,
+          "name": "unité",
+          "code": "UNIT"
+        }
+      },
+      {
+        "code": "STEAK_HACHE",
+        "ingredient": {
+          "id": 2,
+          "name": "Steak haché",
+          "code": "STEAK_HACHE",
+          "image": null
+        },
+        "quantity": 4,
+        "unit": {
+          "id": 1,
+          "name": "unité",
+          "code": "UNIT"
+        }
+      },
+      {
+        "code": "FROMAGE",
+        "ingredient": {
+          "id": 3,
+          "name": "Fromage en tranche",
+          "code": "FROMAGE",
+          "image": null
+        },
+        "quantity": 4,
+        "unit": {
+          "id": 1,
+          "name": "unité",
+          "code": "UNIT"
+        }
+      },
+      {
+        "code": "SALADE",
+        "ingredient": {
+          "id": 4,
+          "name": "Salade verte",
+          "code": "SALADE",
+          "image": null
+        },
+        "quantity": 100,
+        "unit": {
+          "id": 2,
+          "name": "grammes",
+          "code": "G"
+        }
+      },
+      {
+        "code": "SAUCE_BURGER",
+        "ingredient": {
+          "id": 5,
+          "name": "Sauce burger",
+          "code": "SAUCE_BURGER",
+          "image": null
+        },
+        "quantity": 60,
+        "unit": {
+          "id": 2,
+          "name": "grammes",
+          "code": "G"
+        }
+      }
+    ],
+    "steps": [
+      {
+        "id": 1,
+        "code": "PREPARATION_PAINS",
+        "relatedIngredients": ["PAIN_BURGER"],
+        "description": "Coupez les pains à burger en deux et toastez-les légèrement.",
+        "time": 5,
+        "image": null
+      },
+      {
+        "id": 2,
+        "code": "CUISSON_STEAKS",
+        "relatedIngredients": ["STEAK_HACHE"],
+        "description": "Faites cuire les steaks hachés dans une poêle chaude selon votre préférence de cuisson.",
+        "time": 10,
+        "image": null
+      },
+      {
+        "id": 3,
+        "code": "ASSEMBLAGE_BURGER",
+        "relatedIngredients": ["FROMAGE", "SALADE", "SAUCE_BURGER"],
+        "description": "Assemblez les burgers : pain, sauce, steak, fromage, salade, et refermez avec l'autre moitié du pain.",
+        "time": 5,
+        "image": null
+      }
+    ],
+    "alternateSteps": [],
+    "ustensils": [
+      {
+        "id": 1,
+        "name": "Poêle",
+        "code": "POELE",
+        "image": null
+      },
+      {
+        "id": 2,
+        "name": "Spatule",
+        "code": "SPATULE",
+        "image": null
+      }
+    ],
+    "categories": [
+      {
+        "id": 1,
+        "name": "Plat principal",
+        "code": "PLAT_PRINCIPAL"
+      }
+    ],
+    "tags": ["FAST_FOOD", "BURGER", "MAISON"],
+    "nutrition": {
+      "calories": 450,
+      "proteins": 25,
+      "carbs": 30,
+      "fats": 20
+    },
+    "source": {
+      "name": "Recette maison",
+      "url": null
+    },
+    "ratings": {
+      "average": 4.5,
+      "count": 120
+    }
+  }
+]
