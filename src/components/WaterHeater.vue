@@ -1,8 +1,5 @@
 <script>
-import sampleWaterHeaterData from '@/assets/sampleWaterHeaterData.json';
 import ConfigService from "@/services/ConfigService.js";
-import LogService from "@/services/LogService.js";
-import API from "@/http/API.js";
 
 export default {
   name: "WaterHeater",
