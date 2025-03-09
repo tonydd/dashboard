@@ -18,6 +18,7 @@ coverage
 .env
 .env.local
 .env.production
+.env.phone
 
 /cypress/videos/
 /cypress/screenshots/
