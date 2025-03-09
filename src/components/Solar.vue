@@ -25,7 +25,7 @@ export default {
       const now = DateService.now();
       if (SolarService.isSolarProductionPeriod(now)) {
         fetch(ConfigService.getConfig('SOLAR_API_URL'), {mode: "cors"}).then(res => res.json()).then(res => {
-          this.solarData = res.production + ' W';
+          this.solarData = (res.production / 100) + ' W';
         });
       } else {
         this.solarData = 'OFFLINE';

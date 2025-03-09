@@ -4,12 +4,14 @@ namespace App\Service;
 
 use App\Entity\SolarStat;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
 
 final readonly class SolarService
 {
     public function __construct(
+        private LoggerInterface $logger,
         private EntityManagerInterface $entityManager,
         private CacheInterface $cache,
         private ?string $solarClientId = null,
@@ -22,11 +24,14 @@ final readonly class SolarService
     public function update(): void
     {
         if (!$this->isSolarProductionPeriod()) {
+            $this->logger->warning('Cannot update in non solar period');
             return;
         }
 
+        $this->logger->info('Updating solar data');
         $accessToken = $this->getAccessToken();
         if ($accessToken) {
+            $this->logger->info('Access token retrieved');
             $data = $this->getDeviceData($accessToken);
 
             if (isset($data['result'])) {
@@ -39,7 +44,12 @@ final readonly class SolarService
                 $solarStat->setTs(new \DateTime());
                 $this->entityManager->persist($solarStat);
                 $this->entityManager->flush();
+
+            } else {
+                $this->logger->error('Cannot retrieve device data');
             }
+        } else {
+            $this->logger->error('Cannot retrieve access token');
         }
     }
 
@@ -65,7 +75,8 @@ final readonly class SolarService
 
     private function getAccessToken(): ?string
     {
-        return $this->cache->get('tuyaToken', function (ItemInterface $item): ?string {
+        $cachedValue = $this->cache->get('tuyaToken', function (ItemInterface $item): ?string {
+            $this->logger->info('Retrieving tuya access token from API');
             $now = round(microtime(true) * 1000);
             $nonce = $this->generateUUID(); // Génération d'un nonce
 
@@ -101,11 +112,13 @@ final readonly class SolarService
                 $item->expiresAfter($data['result']['expire_time'] - 6);
                 return $data['result']['access_token'];
             } else {
-                $item->expiresAfter(0);
+                $item->expiresAt(((new \DateTime())->modify('-1 day')));
                 return null;
             }
         });
 
+        dump($cachedValue);
+        return $cachedValue;
     }
 
     private function getDeviceData($accessToken): array

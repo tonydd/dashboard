@@ -105,10 +105,10 @@ final readonly class ThermorService
 
             $data = json_decode($response, true);
             if (isset($data['access_token'])) {
-                $item->expiresAfter($data['expires_in'] - 6); // 60 secondes de marge
+                $item->expiresAfter($data['expires_in'] - 6); // 6 secondes de marge
                 return $data['access_token'];
             } else {
-                $item->expiresAfter(0);
+                $item->expiresAt(((new \DateTime())->modify('-1 day')));
                 return null;
             }
         });
@@ -128,6 +128,7 @@ final readonly class ThermorService
             curl_close($ch);
 
             $jwt = str_replace('"', '', $response);
+            $item->expiresAfter(300); // 125 secondes
             return $jwt;
         });
     }
