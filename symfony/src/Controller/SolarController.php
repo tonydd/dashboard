@@ -2,19 +2,18 @@
 
 namespace App\Controller;
 
-use App\Repository\SolarStatRepository;
+use App\Enum\StatValueType;
+use App\Repository\CurrentStatValueRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Serializer\SerializerInterface;
 
 #[Route('/api/solar')]
 class SolarController extends AbstractController
 {
-    public function __invoke(SolarStatRepository $solarStatRepository, SerializerInterface $serializer): JsonResponse
+    public function __invoke(CurrentStatValueRepository $currentStatValueRepository): JsonResponse
     {
-        $lastSolarStat = $solarStatRepository->findLast();
-
-        return $this->json($serializer->normalize($lastSolarStat));
+        $currentStatValue = $currentStatValueRepository->findOneBy(['type' => StatValueType::Solar]);
+        return $this->json($currentStatValue->getValue() ?? []);
     }
 }

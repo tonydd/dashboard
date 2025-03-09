@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\StatValueType;
 use App\Repository\SolarStatRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
@@ -47,5 +48,10 @@ class SolarStat
         $this->production = $production;
 
         return $this;
+    }
+
+    public static function currentValueType(): StatValueType
+    {
+        return StatValueType::Solar;
     }
 }

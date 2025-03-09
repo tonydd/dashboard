@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\StatValueType;
 use App\Repository\FuelStatRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
@@ -62,5 +63,10 @@ class FuelStat
         $this->price = $price;
 
         return $this;
+    }
+
+    public static function currentValueType(): StatValueType
+    {
+        return StatValueType::Fuel;
     }
 }

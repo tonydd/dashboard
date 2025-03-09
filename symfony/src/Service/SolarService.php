@@ -2,9 +2,12 @@
 
 namespace App\Service;
 
+use App\Entity\CurrentStatValue;
 use App\Entity\SolarStat;
+use App\Repository\CurrentStatValueRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
 
@@ -14,6 +17,8 @@ final readonly class SolarService
         private LoggerInterface $logger,
         private EntityManagerInterface $entityManager,
         private CacheInterface $cache,
+        private CurrentStatValueRepository $currentStatValueRepository,
+        private SerializerInterface $serializer,
         private ?string $solarClientId = null,
         private ?string $solarClientSecret = null,
         private ?string $solarDeviceId = null,
@@ -43,6 +48,17 @@ final readonly class SolarService
                 }
                 $solarStat->setTs(new \DateTime());
                 $this->entityManager->persist($solarStat);
+                $this->entityManager->flush();
+
+                $currentStatValue = $this->currentStatValueRepository->findOneBy(['type' => SolarStat::currentValueType()]);
+                if ($currentStatValue) {
+                    $currentStatValue->setValue($this->serializer->normalize($solarStat));
+                } else {
+                    $currentStatValue = new CurrentStatValue();
+                    $currentStatValue->setType(SolarStat::currentValueType());
+                    $currentStatValue->setValue($this->serializer->normalize($solarStat));
+                    $this->entityManager->persist($currentStatValue);
+                }
                 $this->entityManager->flush();
 
             } else {

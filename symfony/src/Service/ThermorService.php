@@ -2,24 +2,29 @@
 
 namespace App\Service;
 
+use App\Entity\CurrentStatValue;
 use App\Entity\WaterHeaterStat;
+use App\Repository\CurrentStatValueRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
 
 final readonly class ThermorService
 {
     public function __construct(
-        private EntityManagerInterface $entityManager,
-        private CacheInterface         $cache,
-        private string                 $atlanticTokenUrl = '',
-        private string                 $atlanticTokenAuthorization = '',
-        private string                 $atlanticUsername = '',
-        private string                 $atlanticPassword = '',
-        private string                 $magellanTokenUrl = '',
-        private string                 $overkizTokenUrl = '',
-        private string                 $overkizAuthorization = '',
-        private string                 $overkizEndpointUrl = '',
+        private EntityManagerInterface     $entityManager,
+        private CacheInterface             $cache,
+        private CurrentStatValueRepository $currentStatValueRepository,
+        private SerializerInterface        $serializer,
+        private string                     $atlanticTokenUrl = '',
+        private string                     $atlanticTokenAuthorization = '',
+        private string                     $atlanticUsername = '',
+        private string                     $atlanticPassword = '',
+        private string                     $magellanTokenUrl = '',
+        private string                     $overkizTokenUrl = '',
+        private string                     $overkizAuthorization = '',
+        private string                     $overkizEndpointUrl = '',
     )
     {
     }
@@ -76,6 +81,17 @@ final readonly class ThermorService
         $waterHeaterStat->setWh($out['electricalConsumption']);
         $waterHeaterStat->setTs(new \DateTime());
         $this->entityManager->persist($waterHeaterStat);
+        $this->entityManager->flush();
+
+        $currentStatValue = $this->currentStatValueRepository->findOneBy(['type' => WaterHeaterStat::currentValueType()]);
+        if ($currentStatValue) {
+            $currentStatValue->setValue($this->serializer->normalize($waterHeaterStat));
+        } else {
+            $currentStatValue = new CurrentStatValue();
+            $currentStatValue->setType(WaterHeaterStat::currentValueType());
+            $currentStatValue->setValue($this->serializer->normalize($waterHeaterStat));
+            $this->entityManager->persist($currentStatValue);
+        }
         $this->entityManager->flush();
     }
 
