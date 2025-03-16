@@ -50,7 +50,7 @@ const color = computed(() => {
 <template>
   <div class="row flex-center-vertical">
     <v-icon :color="color">mdi-water-check</v-icon>
-      <h3>{{ waterQuality.score }}</h3>
+      <h3 style="margin-left: 4px;">{{ waterQuality.score }}</h3>
       <label style="color: lightgray; font-size: 10px; margin-left: 4px">{{ waterQuality.status }}</label>
   </div>
 </template>
