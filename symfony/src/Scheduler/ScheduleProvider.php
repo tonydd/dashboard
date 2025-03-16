@@ -5,6 +5,7 @@ namespace App\Scheduler;
 use App\Scheduler\Message\FuelMessage;
 use App\Scheduler\Message\SolarMessage;
 use App\Scheduler\Message\ThermorMessage;
+use App\Scheduler\Message\WaterQualityMessage;
 use Symfony\Component\Scheduler\Attribute\AsSchedule;
 use Symfony\Component\Scheduler\RecurringMessage;
 use Symfony\Component\Scheduler\Schedule;
@@ -19,6 +20,7 @@ class ScheduleProvider implements ScheduleProviderInterface
             RecurringMessage::every(3600, new FuelMessage()),
             RecurringMessage::every(100, new SolarMessage()),
             RecurringMessage::every(120, new ThermorMessage()),
+            RecurringMessage::every('12 hour', new WaterQualityMessage()),
         );
     }
 }

@@ -1,21 +1,18 @@
 <script>
-
-import {defineComponent} from "vue";
-import Tablet from "@/components/templates/Tablet.vue";
-import Phone  from "@/components/templates/Phone.vue";
+import { defineComponent, defineAsyncComponent } from "vue";
 import ConfigService from "@/services/ConfigService.js";
 
 export default defineComponent({
-  components: {
-    Tablet,
-  },
   computed: {
     templateComponent() {
-      return ConfigService.getConfig('TARGET') === 'phone' ? Phone : Tablet;
+      const target = ConfigService.getConfig('TARGET');
+      return defineAsyncComponent(() => 
+        import(`@/components/templates/${target.charAt(0).toUpperCase() + target.slice(1)}.vue`)
+          .catch(() => import('@/components/ErrorComponent.vue'))
+      );
     },
   },
 });
-
 </script>
 
 <template>

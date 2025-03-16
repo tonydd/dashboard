@@ -3,8 +3,8 @@
     <div class="row">
       <label style="font-weight: bold">Actus SSF</label>
     </div>
-    <div class="row">
-      <h6 class="col" style="max-width: 33%" v-for="(newsItem, idx) in news" @click="() => clickNews(idx)"
+    <div class="row" v-for="(newsItem, idx) in news" @click="() => clickNews(idx)">
+      <h6
       >{{ newsItem.title }}</h6>
     </div>
   </div>

@@ -12,8 +12,9 @@
           <Timer icon="mdi-toaster-oven" name="timer-oven" />
         </div>
         <div class="column flex-center-vertical flex-center-horizontal">
-          <Solar class="flex-center-horizontal flex-center-vertical"/>
+          <Solar/>
           <WaterHeater />
+          <WaterQuality />
         </div>
       </div>
     </div>
@@ -59,4 +60,5 @@ import Weather from "@/components/Weather.vue";
 import Timer from "@/components/Timer.vue";
 import CustomMessage from "@/components/CustomMessage.vue";
 import ConfigService from "@/services/ConfigService.js";
+import WaterQuality from "@/components/WaterQuality.vue";
 </script>

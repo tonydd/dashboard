@@ -59,8 +59,7 @@ export default {
 </script>
 
 <template>
-  <div @click="showDialog">
-    <div class="row flex-center-vertical flex-center-horizontal" style="padding-left: 4px;">
+    <div class="row" @click="showDialog">
       <v-icon size="x-large" :color="waterHeaterData.heatingState ? 'red' : 'white'">mdi-water-boiler</v-icon>
       <div>
         <h3 style="display: inline">&nbsp;{{ Math.round((waterHeaterData.available40Degrees * 100) / 200) }}%</h3>
@@ -68,7 +67,7 @@ export default {
       </div>
     </div>
     <div v-if="false">
-      <div class="row flex-center-vertical">
+      <div class="row">
         <v-icon size="x-small">mdi-heat-wave</v-icon>
         <h4 :class="{red: waterHeaterData.heatingState}">
           &nbsp;{{ waterHeaterData.heatingState ? 'En chauffe' : 'Au repos' }}</h4>
@@ -82,7 +81,6 @@ export default {
         <h4>&nbsp;{{ Math.round(waterHeaterData.wh / 1000) }} kWh</h4>
       </div>
     </div>
-  </div>
 
   <v-dialog
       v-model="dialog"

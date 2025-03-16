@@ -40,6 +40,9 @@
             "tests/bootstrap.php"
         ]
     },
+    "symfony-bundles/json-request-bundle": {
+        "version": "4.2.0"
+    },
     "symfony/asset-mapper": {
         "version": "7.1",
         "recipe": {
@@ -275,6 +278,9 @@
             "config/packages/web_profiler.yaml",
             "config/routes/web_profiler.yaml"
         ]
+    },
+    "symfonycasts/verify-email-bundle": {
+        "version": "v1.17.3"
     },
     "twig/extra-bundle": {
         "version": "v3.13.0"
