@@ -1,18 +1,22 @@
 <script>
-import { ref, defineAsyncComponent } from "vue";
 import ConfigService from "@/services/ConfigService.js";
+import Tablet from "@/components/templates/Tablet.vue";
+import Phone  from "@/components/templates/Phone.vue";
 
 export default {
-  setup() {
-    const target = ConfigService.getConfig("TARGET");
-    const templateComponent = ref(
-        defineAsyncComponent(() =>
-            import(`@/components/templates/${target.charAt(0).toUpperCase() + target.slice(1)}.vue`)
-                .catch(() => import("@/components/ErrorComponent.vue"))
-        )
-    );
+  computed: {
+    templateComponent() {
+      const target = ConfigService.getConfig("TARGET");
 
-    return { templateComponent };
+      switch (target) {
+        case "tablet":
+          return Tablet;
+        case "phone":
+          return Phone;
+        default:
+          return Tablet;
+      }
+    }
   },
 };
 </script>
