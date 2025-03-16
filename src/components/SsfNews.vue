@@ -40,7 +40,6 @@
 </template>
 <script setup>
 import {onMounted, onUnmounted, ref, watch} from "vue";
-import DateService from "@/services/DateService.js";
 
 const jqueryLoaded = ref(false); // État pour suivre le chargement de jQuery
 const news = ref([]);
@@ -84,7 +83,6 @@ onUnmounted(() => {
   if (script) {
     script.remove();
     delete window.jQuery;
-    delete window.$;
   }
 });
 
@@ -129,7 +127,7 @@ const clickNews = async (idx) => {
   dialog.value = true;
 }
 
-watch(jqueryLoaded, (nv, ov) => {
+watch(jqueryLoaded, (nv) => {
   if (nv) {
     fetchNews();
   }

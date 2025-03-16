@@ -30,7 +30,7 @@ const color = computed(() => {
     return "white";
   }
 
-  let color = '';
+  let color;
   switch (true) {
     case waterQuality.value.score < 8:
       color = "red";
@@ -54,21 +54,3 @@ const color = computed(() => {
       <label style="color: lightgray; font-size: 10px; margin-left: 4px">{{ waterQuality.status }}</label>
   </div>
 </template>
-
-<style scoped>
-.fuel-update {
-  font-size: smaller;
-}
-
-.v-col {
-  padding-left: 0;
-  padding-right: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-}
-
-.v-row {
-  padding: 0;
-  margin: 0;
-}
-</style>

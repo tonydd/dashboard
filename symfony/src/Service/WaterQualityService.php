@@ -11,7 +11,6 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 final readonly class WaterQualityService
 {
     public function __construct(
-        private LoggerInterface $logger,
         private EntityManagerInterface $entityManager,
         private HttpClientInterface $httpClient,
     ) {
