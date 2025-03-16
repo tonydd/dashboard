@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host --port 5174",
-    "build": "VITE_BASE_URL=/tablet/ vite build",
+    "build": "VITE_BASE_URL=/tablet/ vite build -- --sourcemap",
     "build:phone": "VITE_BASE_URL=/phone/ vite build --mode phone",
     "preview": "vite preview"
   },
