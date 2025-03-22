@@ -43,7 +43,7 @@ final readonly class FuelService
         foreach ($fuelData as $fuel) {
             if (in_array($fuel['short_name'], ['Gazole', 'SP95-E10', 'SP98'])) {
 
-                $fuelStat = $this->fuelStatRepository->findLastByType($fuel['picto']);
+                $fuelStat = $this->fuelStatRepository->findLastByType(FuelType::from($fuel['picto']));
                 if ($fuelStat && $fuelStat->getPrice() === $fuel['Price']['value']) {
                     $fuelStat->setTs(new \DateTimeImmutable());
                 } else {
