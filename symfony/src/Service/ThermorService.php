@@ -5,6 +5,7 @@ namespace App\Service;
 use App\Entity\CurrentStatValue;
 use App\Entity\WaterHeaterStat;
 use App\Repository\CurrentStatValueRepository;
+use App\Repository\WaterHeaterStatRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Contracts\Cache\CacheInterface;
@@ -17,6 +18,7 @@ final readonly class ThermorService
         private CacheInterface             $cache,
         private CurrentStatValueRepository $currentStatValueRepository,
         private SerializerInterface        $serializer,
+        private WaterHeaterStatRepository  $waterHeaterStatRepository,
         private string                     $atlanticTokenUrl = '',
         private string                     $atlanticTokenAuthorization = '',
         private string                     $atlanticUsername = '',
@@ -74,13 +76,24 @@ final readonly class ThermorService
             }
         }
 
-        $waterHeaterStat = new WaterHeaterStat();
-        $waterHeaterStat->setHeatingState($out['heatingState']);
-        $waterHeaterStat->setWaterTemperature($out['waterTemperature']);
-        $waterHeaterStat->setAvailable40Degrees($out['V40Capacity']);
-        $waterHeaterStat->setWh($out['electricalConsumption']);
-        $waterHeaterStat->setTs(new \DateTime());
-        $this->entityManager->persist($waterHeaterStat);
+        $waterHeaterStat = $this->waterHeaterStatRepository->findLast();
+        if ($waterHeaterStat
+            && $waterHeaterStat->getWh() === $out['electricalConsumption']
+            && $waterHeaterStat->getWaterTemperature() === $out['waterTemperature']
+            && $waterHeaterStat->getAvailable40Degrees() === $out['V40Capacity']
+            && $waterHeaterStat->isHeatingState() === $out['heatingState']
+        ) {
+            $waterHeaterStat->setTs(new \DateTime());
+        } else {
+            $waterHeaterStat = new WaterHeaterStat();
+            $waterHeaterStat->setHeatingState($out['heatingState']);
+            $waterHeaterStat->setWaterTemperature($out['waterTemperature']);
+            $waterHeaterStat->setAvailable40Degrees($out['V40Capacity']);
+            $waterHeaterStat->setWh($out['electricalConsumption']);
+            $waterHeaterStat->setTs(new \DateTime());
+            $this->entityManager->persist($waterHeaterStat);
+        }
+
         $this->entityManager->flush();
 
         $currentStatValue = $this->currentStatValueRepository->findOneBy(['type' => WaterHeaterStat::currentValueType()]);

@@ -6,13 +6,18 @@ use App\Entity\CurrentStatValue;
 use App\Entity\FuelStat;
 use App\Enum\FuelType;
 use App\Repository\CurrentStatValueRepository;
+use App\Repository\FuelStatRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Serializer\SerializerInterface;
 
-class FuelService
+final readonly class FuelService
 {
-    public function __construct(private EntityManagerInterface $entityManager, private CurrentStatValueRepository $currentStatValueRepository, private SerializerInterface $serializer)
-    {
+    public function __construct(
+        private EntityManagerInterface $entityManager,
+        private CurrentStatValueRepository $currentStatValueRepository,
+        private SerializerInterface $serializer,
+        private FuelStatRepository $fuelStatRepository
+    ) {
     }
 
     public function update(): void
@@ -37,11 +42,18 @@ class FuelService
         $fuels = [];
         foreach ($fuelData as $fuel) {
             if (in_array($fuel['short_name'], ['Gazole', 'SP95-E10', 'SP98'])) {
-                $fuelStat = new FuelStat();
-                $fuelStat->setPrice($fuel['Price']['value']);
-                $fuelStat->setTs(new \DateTime());
-                $fuelStat->setType($fuel['picto']);
-                $this->entityManager->persist($fuelStat);
+
+                $fuelStat = $this->fuelStatRepository->findLastByType($fuel['picto']);
+                if ($fuelStat && $fuelStat->getPrice() === $fuel['Price']['value']) {
+                    $fuelStat->setTs(new \DateTimeImmutable());
+                } else {
+                    $fuelStat = new FuelStat();
+                    $fuelStat->setPrice($fuel['Price']['value']);
+                    $fuelStat->setTs(new \DateTimeImmutable());
+                    $fuelStat->setType($fuel['picto']);
+                    $this->entityManager->persist($fuelStat);
+                }
+
                 $fuels[FuelType::from($fuel['picto'])->name] = $fuelStat;
             }
         }

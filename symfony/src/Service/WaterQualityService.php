@@ -4,8 +4,8 @@ namespace App\Service;
 
 use App\Entity\CurrentStatValue;
 use App\Enum\StatValueType;
+use App\Repository\CurrentStatValueRepository;
 use Doctrine\ORM\EntityManagerInterface;
-use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 final readonly class WaterQualityService
@@ -13,6 +13,7 @@ final readonly class WaterQualityService
     public function __construct(
         private EntityManagerInterface $entityManager,
         private HttpClientInterface $httpClient,
+        private CurrentStatValueRepository $currentStatValueRepository,
     ) {
     }
 
@@ -24,10 +25,15 @@ final readonly class WaterQualityService
         $content = $response->toArray();
 
         $waterQuality = $this->evaluateWaterQuality($content);
-        $currentStatValue = new CurrentStatValue();
-        $currentStatValue->setType(StatValueType::WaterQuality);
-        $currentStatValue->setValue($waterQuality);
-        $this->entityManager->persist($currentStatValue);
+        $currentStatValue = $this->currentStatValueRepository->findOneBy(['type' => StatValueType::WaterQuality]);
+        if ($currentStatValue) {
+            $currentStatValue->setValue($waterQuality);
+        } else {
+            $currentStatValue = new CurrentStatValue();
+            $currentStatValue->setType(StatValueType::WaterQuality);
+            $currentStatValue->setValue($waterQuality);
+            $this->entityManager->persist($currentStatValue);
+        }
         $this->entityManager->flush();
     }
 
