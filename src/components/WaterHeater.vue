@@ -54,13 +54,24 @@ export default {
       let history = JSON.parse(localStorage.getItem('waterBoilerHistory'));
       return history.history[index].date;
     }
+  },
+  computed: {
+    color() {
+      if (this.waterHeaterData.heatingState) {
+        return 'red';
+      }
+      if (this.waterHeaterData.absenceMode) {
+        return 'grey';
+      }
+      return 'white';
+    }
   }
 }
 </script>
 
 <template>
     <div class="row" @click="showDialog">
-      <v-icon size="x-large" :color="waterHeaterData.heatingState ? 'red' : 'white'">mdi-water-boiler</v-icon>
+      <v-icon size="x-large" :color="color">mdi-water-boiler</v-icon>
       <div>
         <h3 style="display: inline">&nbsp;{{ Math.round((waterHeaterData.available40Degrees * 100) / 200) }}%</h3>
         <h6 style="color: lightgrey; display: inline">&nbsp;{{ Math.round((waterHeaterData.available40Degrees * 100) / 333) }}%</h6>

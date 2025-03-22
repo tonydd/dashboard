@@ -16,6 +16,7 @@ parameters:
     overkizTokenUrl: '%env(string:OVERKIZ_TOKEN_URL)%'
     overkizAuthorization: '%env(string:OVERKIZ_AUTHORIZATION)%'
     overkizEndpointUrl: '%env(string:OVERKIZ_ENDPOINT_URL)%'
+    overkizEndpointCommandUrl: '%env(string:OVERKIZ_ENDPOINT_COMMAND_URL)%'
 
 services:
     # default configuration for services in *this* file
@@ -35,6 +36,7 @@ services:
             $overkizTokenUrl: '%overkizTokenUrl%'
             $overkizAuthorization: '%overkizAuthorization%'
             $overkizEndpointUrl: '%overkizEndpointUrl%'
+            $overkizEndpointCommandUrl: '%overkizEndpointCommandUrl%'
 
 
     # Automatically injects dependencies in your services.

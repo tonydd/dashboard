@@ -30,6 +30,9 @@ class WaterHeaterStat
     #[ORM\Column]
     private ?float $waterTemperature = null;
 
+    #[ORM\Column(type: Types::BOOLEAN, nullable: true)]
+    private ?bool $absenceMode = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -90,6 +93,17 @@ class WaterHeaterStat
     public function setWaterTemperature(?float $waterTemperature): WaterHeaterStat
     {
         $this->waterTemperature = $waterTemperature;
+        return $this;
+    }
+
+    public function isAbsenceMode(): bool
+    {
+        return (bool) $this->absenceMode;
+    }
+
+    public function setAbsenceMode(bool $absenceMode): WaterHeaterStat
+    {
+        $this->absenceMode = $absenceMode;
         return $this;
     }
 

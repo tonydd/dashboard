@@ -8,6 +8,7 @@ use App\Repository\CurrentStatValueRepository;
 use App\Repository\SolarStatRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
@@ -21,6 +22,7 @@ final readonly class SolarService
         private CurrentStatValueRepository $currentStatValueRepository,
         private SerializerInterface $serializer,
         private SolarStatRepository $solarStatRepository,
+        private Filesystem $filesystem,
         private ?string $solarClientId = null,
         private ?string $solarClientSecret = null,
         private ?string $solarDeviceId = null,
@@ -41,18 +43,29 @@ final readonly class SolarService
             $this->logger->info('Access token retrieved');
             $data = $this->getDeviceData($accessToken);
 
+            $this->filesystem->dumpFile('./var/files/solarData.json', json_encode($data, JSON_PRETTY_PRINT));
+
             if (isset($data['result'])) {
 
+                $production = null;
+                foreach ($data['result'] as $item) {
+                    if ($item['code'] === 'out_power') {
+                        $production  = $item['value'];
+                        break;
+                    }
+                }
+
+                if ($production === null) {
+                    $this->logger->error('Cannot retrieve production data');
+                    return;
+                }
+
                 $solarStat = $this->solarStatRepository->findLast();
-                if ($solarStat && $solarStat->getProduction() === $data['result']['out_power']) {
+                if ($solarStat && $solarStat->getProduction() === $production) {
                     $solarStat->setTs(new \DateTime());
                 } else {
                     $solarStat = new SolarStat();
-                    foreach ($data['result'] as $item) {
-                        if ($item['code'] === 'out_power') {
-                            $solarStat->setProduction($item['value']);
-                        }
-                    }
+                    $solarStat->setProduction($production);
                     $solarStat->setTs(new \DateTime());
                     $this->entityManager->persist($solarStat);
                 }

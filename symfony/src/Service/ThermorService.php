@@ -7,9 +7,11 @@ use App\Entity\WaterHeaterStat;
 use App\Repository\CurrentStatValueRepository;
 use App\Repository\WaterHeaterStatRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 final readonly class ThermorService
 {
@@ -19,6 +21,8 @@ final readonly class ThermorService
         private CurrentStatValueRepository $currentStatValueRepository,
         private SerializerInterface        $serializer,
         private WaterHeaterStatRepository  $waterHeaterStatRepository,
+        private Filesystem                 $filesystem,
+        private HttpClientInterface        $httpClient,
         private string                     $atlanticTokenUrl = '',
         private string                     $atlanticTokenAuthorization = '',
         private string                     $atlanticUsername = '',
@@ -27,8 +31,18 @@ final readonly class ThermorService
         private string                     $overkizTokenUrl = '',
         private string                     $overkizAuthorization = '',
         private string                     $overkizEndpointUrl = '',
+        private string                     $overkizEndpointCommandUrl = '',
     )
     {
+    }
+
+
+    public function command(): void
+    {
+        $atlanticToken = $this->atlanticToken();
+        $magellanToken = $this->magellanToken($atlanticToken);
+        $cookieValue = $this->endUserAPILogin($magellanToken);
+        $this->execCommand($cookieValue);
     }
 
     public function update(): void
@@ -37,6 +51,8 @@ final readonly class ThermorService
         $magellanToken = $this->magellanToken($atlanticToken);
         $cookieValue = $this->endUserAPILogin($magellanToken);
         $setup = $this->setup($cookieValue);
+
+        $this->filesystem->dumpFile('./var/files/thermorData.json', json_encode($setup, JSON_PRETTY_PRINT));
 
         $out = [];
         foreach (($setup['devices'] ?? []) as $device) {
@@ -64,6 +80,13 @@ final readonly class ThermorService
                 $remainingHotWaterState = reset($remainingHotWaterState);
                 $out['V40Capacity'] = $remainingHotWaterState ? $remainingHotWaterState['value'] : null;
 
+                // Trouver l'état 'modbuslink:DHWAbsenceModeState'
+                $absenceModeState = array_filter($states, function ($state) {
+                    return $state['name'] === 'modbuslink:DHWAbsenceModeState';
+                });
+                $absenceModeState = reset($absenceModeState);
+                $out['absenceMode'] = $absenceModeState ? ($absenceModeState['value'] === 'off' ? 0 : 1) : null;
+
             } elseif ($device['controllableName'] === 'modbuslink:DHWCumulatedElectricalEnergyConsumptionMBLSystemDeviceSensor') {
                 $states = $device['states'];
 
@@ -82,6 +105,7 @@ final readonly class ThermorService
             && $waterHeaterStat->getWaterTemperature() === $out['waterTemperature']
             && $waterHeaterStat->getAvailable40Degrees() === $out['V40Capacity']
             && $waterHeaterStat->isHeatingState() === $out['heatingState']
+            && $waterHeaterStat->isAbsenceMode() === $out['absenceMode']
         ) {
             $waterHeaterStat->setTs(new \DateTime());
         } else {
@@ -91,6 +115,7 @@ final readonly class ThermorService
             $waterHeaterStat->setAvailable40Degrees($out['V40Capacity']);
             $waterHeaterStat->setWh($out['electricalConsumption']);
             $waterHeaterStat->setTs(new \DateTime());
+            $waterHeaterStat->setAbsenceMode($out['absenceMode']);
             $this->entityManager->persist($waterHeaterStat);
         }
 
@@ -217,5 +242,27 @@ final readonly class ThermorService
         curl_close($ch);
 
         return json_decode($response, true);
+    }
+
+    private function execCommand(string $cookieValue): array
+    {
+        $data = [];
+
+        $response = $this->httpClient->request('POST', $this->overkizEndpointCommandUrl, [
+            'headers' => [
+                'Host' => 'ha110-1.overkiz.com',
+                'Connection' => 'keep-alive',
+                'Cache-Control' => 'no-cache',
+                'Cookie' => 'JSESSIONID=' . $cookieValue,
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json'
+            ],
+            'json' => $data,
+        ]);
+
+        $responseData = $response->toArray(false);
+        //dd($responseData);
+
+        return $responseData;
     }
 }

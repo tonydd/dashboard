@@ -2,7 +2,6 @@
 
 namespace App\Command;
 
-use App\Entity\SolarStat;
 use App\Entity\WaterHeaterStat;
 use App\Repository\WaterHeaterStatRepository;
 use Symfony\Component\Console\Attribute\AsCommand;
