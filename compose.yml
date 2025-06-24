@@ -1,7 +1,19 @@
 services:
+  php:
+    build:
+      context: Docker/php
+      dockerfile: Dockerfile
+    container_name: app_php
+    volumes:
+      - ./symfony:/var/www/html
+    working_dir: /var/www/html/public
+    command: php -S 0.0.0.0:80 -t .
+    ports:
+      - "8000:80"
+    depends_on:
+      - db
   db:
     image: mysql:8.0
-    restart: always
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: dashboard
