@@ -21,12 +21,8 @@ export default defineConfig({
   },
   server: {
     fs: {
-      // Allow serving files from one level up to the project root
-      allow: [
-          '/home/tony/projets/dashboard/node_modules/@mdi/font/fonts',
-          '/home/tony/projets/dashboard/',
-          '/home/tony/node_modules'
-      ],
+      host: true,
+      port: 5174,
     },
   },
 })

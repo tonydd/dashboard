@@ -2,6 +2,7 @@
 
 namespace App\EventSubscriber;
 
+use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
@@ -12,7 +13,9 @@ class KernelSubscriber implements EventSubscriberInterface
 {
     private const ALLOWED_ORIGINS = [
         'http://localhost:5174',
-        'http://localhost:5174',
+        'https://localhost:5174',
+        'http://127.0.0.1:5174',
+        'https://127.0.0.1:5174',
         'http://dendrijver.duckdns.org',
         'https://dendrijver.duckdns.org',
     ];
