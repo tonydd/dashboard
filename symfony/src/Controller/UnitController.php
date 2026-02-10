@@ -15,6 +15,12 @@ class UnitController extends AbstractController
     public function __construct(private readonly NormalizerInterface $normalizer, private readonly SluggerInterface $slugger)
     {
     }
+
+    #[Route('/api/units', name: 'units')]
+    public function getUnits(UnitRepository $unitRepository): JsonResponse
+    {
+        return $this->json($this->normalizer->normalize($unitRepository->findAll(), 'json', ['groups' => 'list']));
+    }
     
     #[Route('/api/units/autocomplete', name: 'units_autocomplete', methods: ['GET'])]
     public function getUnitsAutocomplete(Request $request, UnitRepository $unitRepository): JsonResponse

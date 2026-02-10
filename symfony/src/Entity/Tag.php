@@ -13,14 +13,15 @@ class Tag
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['recipe:detail'])]
+    #[Groups(['list', 'recipe:detail'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
-    #[Groups(['recipe:detail'])]
+    #[Groups(['list', 'recipe:detail'])]
     private ?string $code = null;
 
     #[ORM\Column(length: 255)]
+    #[Groups(['list'])]
     private ?string $slug = null;
 
     public function getId(): ?int

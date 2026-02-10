@@ -26,10 +26,12 @@ use Symfony\Component\String\Slugger\SluggerInterface;
 class RecipeController extends AbstractController
 {
     public function __construct(
-        private readonly SerializerInterface $serializer,
-        private readonly LoggerInterface     $logger,
-        private readonly SluggerInterface    $slugger,
-        private readonly KernelInterface     $kernel,
+        private readonly SerializerInterface    $serializer,
+        private readonly LoggerInterface        $logger,
+        private readonly SluggerInterface       $slugger,
+        private readonly KernelInterface        $kernel,
+        private readonly EntityManagerInterface $entityManager,
+        private readonly IngredientRepository   $ingredientRepository,
     )
     {
     }
@@ -58,10 +60,8 @@ class RecipeController extends AbstractController
     #[Route('/api/recipes', name: 'recipe_create', methods: ['POST'])]
     public function createRecipe(
         RecipeRepository               $recipeRepository,
-        IngredientRepository           $ingredientRepository,
         UnitRepository                 $unitRepository,
         TagRepository                  $tagRepository,
-        EntityManagerInterface         $entityManager,
         #[MapRequestPayload] RecipeDto $recipeDto,
     ): JsonResponse
     {
@@ -78,19 +78,29 @@ class RecipeController extends AbstractController
 
             $tagIds = array_column($recipeDto->tags, 'id');
             $ingredientIds = $unitIds = [];
-            foreach ($recipeDto->recipeIngredients as $recipeIngredient) {
+            $recipeIngredients = $recipeDto->recipeIngredients;
+
+            foreach ($recipeIngredients as &$recipeIngredient) {
                 $id = $recipeIngredient['ingredient']['id'] ?? null;
                 if ($id !== null) {
                     $ingredientIds[] = $id;
+                } else {
+                    $newIngredient = $this->initIngredient($recipeIngredient['ingredient']);
+                    $ingredientIds[] = $newIngredient->getId();
+                    $recipeIngredient['ingredient']['id'] = $newIngredient->getId();
                 }
 
                 $id = $recipeIngredient['unit']['id'] ?? null;
                 if ($id !== null) {
                     $unitIds[] = $id;
+                } else {
+                    $newUnit = $this->initUnit($recipeIngredient['unit']);
+                    $unitIds[] = $newUnit->getId();
+                    $recipeIngredient['unit']['id'] = $newUnit->getId();
                 }
             }
 
-            $ingredients = $ingredientRepository->findBy(['id' => $ingredientIds]);
+            $ingredients = $this->ingredientRepository->findBy(['id' => $ingredientIds]);
             $units = $unitRepository->findBy(['id' => $unitIds]);
 
             $recipe = (new Recipe())
@@ -102,7 +112,7 @@ class RecipeController extends AbstractController
                 $recipe->addTag($tag);
             }
 
-            foreach ($recipeDto->recipeIngredients as $recipeIngredient) {
+            foreach ($recipeIngredients as $recipeIngredient) {
                 $recipeIngredientEntity = (new RecipeIngredient())
                     ->setIngredient(\array_find($ingredients, static fn(Ingredient $ingredient): bool => $ingredient->getId() === $recipeIngredient['ingredient']['id']))
                     ->setUnit(\array_find($units, static fn(Unit $unit): bool => $unit->getId() === $recipeIngredient['unit']['id']))
@@ -125,8 +135,8 @@ class RecipeController extends AbstractController
                 $recipe->addStep($stepEntity);
             }
 
-            $entityManager->persist($recipe);
-            $entityManager->flush();
+            $this->entityManager->persist($recipe);
+            $this->entityManager->flush();
 
             return $this->json(['success' => true]);
         } catch (\Throwable $t) {
@@ -138,5 +148,45 @@ class RecipeController extends AbstractController
             }
             return $this->json($payload, 500);
         }
+    }
+
+    private function initIngredient(array $ingredientData): Ingredient
+    {
+        $name = $ingredientData['name'] ?? null;
+        if ($name === null) {
+            throw new \InvalidArgumentException('Ingredient name is null');
+        }
+
+        $ingredient = $this->tryGetIngredient($name);
+        if ($ingredient) {
+            return $ingredient;
+        }
+
+        $ingredient = (new Ingredient())->setName($name)->setSlug($this->slugger->slug($name))->setEmoji($ingredientData['emoji'] ?? null);
+        $this->entityManager->persist($ingredient);
+        $this->entityManager->flush();
+        return $ingredient;
+    }
+
+    private function tryGetIngredient(string $name): ?Ingredient
+    {
+        $found = $this->ingredientRepository->getAutocompleteResults($this->slugger->slug($name));
+        if (count($found) === 1) {
+            return $found[0];
+        }
+        return null;
+    }
+
+    private function initUnit(array $unitData): Unit
+    {
+        $name = $unitData['name'] ?? null;
+        if ($name === null) {
+            throw new \InvalidArgumentException('Unit name is null');
+        }
+
+        $unit = (new Unit())->setName($name)->setSlug($this->slugger->slug($name))->setCode($unitData['code'] ?? null);
+        $this->entityManager->persist($unit);
+        $this->entityManager->flush();
+        return $unit;
     }
 }

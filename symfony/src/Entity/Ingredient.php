@@ -30,6 +30,7 @@ class Ingredient
     private ?string $picture = null;
 
     #[ORM\Column(length: 255)]
+    #[Groups(['list'])]
     private ?string $slug = null;
 
     #[ORM\Column(length: 16, nullable: true)]
