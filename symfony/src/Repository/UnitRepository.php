@@ -24,7 +24,7 @@ class UnitRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('u')
             ->andWhere('u.slug LIKE :term OR u.code LIKE :term')
-            ->setParameter('term', $term . '%')
+            ->setParameter('term', '%' . $term . '%')
             ->getQuery()
             ->getResult();
     }
