@@ -80,7 +80,7 @@
         </transition-group>
 
         <div class="row mt-4">
-          <v-btn class="big-btn mr-4" @click="currentStep = 'intro'">
+          <v-btn class="big-btn back mr-4" @click="currentStep = 'intro'">
             ←
           </v-btn>
 
@@ -93,7 +93,7 @@
       <template v-else-if="typeof currentStep === 'number'">
 
         <h2>Étape N°{{ currentStep + 1 }}</h2>
-        <Stepper :total="recipe.recipeSteps.length" :current="currentStep" class="mt-6 mb-8" />
+        <Stepper :total="recipe.recipeSteps.length" :current="currentStep" class="mt-6 mb-8"/>
 
         <div class="row" style="font-size: 1.5rem">
           <div class="column col-30 col-border-right">
@@ -117,7 +117,7 @@
         </div>
 
         <div class="row mt-4">
-          <v-btn class="big-btn mr-4" @click="currentStep = (currentStep === 0) ? 'intro' : currentStep - 1">
+          <v-btn class="big-btn back mr-4" @click="currentStep = (currentStep === 0) ? 'intro' : currentStep - 1">
             ←
           </v-btn>
 
@@ -130,10 +130,16 @@
       <template v-else-if="currentStep === 'conclusion'">
         <h2>Bon appétit !</h2>
 
-        <img :src="imageUrl" style="max-width: 50%" />
-          <v-btn class="big-btn mr-4" @click="currentStep = recipe.recipeSteps.length - 1">
+        <img :src="imageUrl" style="max-width: 50%"/>
+
+        <div class="row mt-4 flex-center-horizontal align-center">
+          <v-btn class="big-btn back mr-4" @click="currentStep = recipe.recipeSteps.length - 1">
             ←
           </v-btn>
+          <v-btn class="big-btn mr-4" @click="navigateTo('/tablet')">
+            Revenir à l'écran principal
+          </v-btn>
+        </div>
       </template>
     </div>
   </template>
@@ -141,13 +147,15 @@
 
 <script setup lang="ts">
 import API from "@/http/API";
-import {nextTick, onBeforeMount, ref} from "vue";
+import {inject, nextTick, onBeforeMount, ref} from "vue";
 import {Recipe} from "@/types/Recipe";
 import {RecipeIngredient} from "@/types/RecipeIngredient";
 import {RecipeStep} from "@/types/RecipeStep";
 import Stepper from "@/components/recipe/Stepper.vue";
 import imageUrl from '@/assets/chef.png';
 import ConfigService from "@/services/ConfigService.js";
+import Link from "@/components/core/Link.vue";
+
 const apiBaseUrl = ConfigService.getConfig('API_BASE_URL');
 
 const props = withDefaults(
@@ -188,6 +196,7 @@ const nextRecipeStep = () => {
   }
 }
 
+const navigateTo = inject<Function>('navigateTo');
 </script>
 
 <style scoped>
@@ -269,6 +278,13 @@ const nextRecipeStep = () => {
 .big-btn {
   height: 100px;
   width: 250px;
+  border: 2px solid white;
+}
+
+.big-btn.back {
+  font-size: 64px;
+  font-weight: bolder;
+  padding-bottom: 20px;
 }
 
 .no-list-style {
