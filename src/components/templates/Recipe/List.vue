@@ -28,7 +28,7 @@ const apiBaseUrl = ConfigService.getConfig('API_BASE_URL');
 let initialRecipes: Recipe[] = [];
 const recipes = ref<Recipe[]>([]);
 API.get(
-    apiBaseUrl + '/recipes',
+    apiBaseUrl + '/recipes/latest',
     {},
     'cors'
 ).then((res: Recipe[]) => {

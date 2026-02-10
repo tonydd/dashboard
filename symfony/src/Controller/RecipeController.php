@@ -43,6 +43,13 @@ class RecipeController extends AbstractController
         return $this->json($this->serializer->normalize($recipes, 'json', ['groups' => 'recipe:list']));
     }
 
+    #[Route('/api/recipes/latest', name: 'recipes', methods: ['GET'])]
+    public function getLatestRecipes(RecipeRepository $recipeRepository): JsonResponse
+    {
+        $recipes = $recipeRepository->findBy([], ['id' => 'DESC'], 10);
+        return $this->json($this->serializer->normalize($recipes, 'json', ['groups' => 'recipe:list']));
+    }
+
     #[Route('/api/recipe/{id}', name: 'recipe', methods: ['GET'])]
     public function getRecipe(Recipe $recipe): JsonResponse
     {
