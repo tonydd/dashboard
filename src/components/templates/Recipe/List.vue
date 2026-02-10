@@ -23,11 +23,12 @@ import {Recipe} from "@/types/Recipe";
 import debounce from 'lodash-es/debounce';
 import API from "@/http/API";
 import Link from "@/components/core/Link.vue";
-
+import ConfigService from "@/services/ConfigService.js";
+const apiBaseUrl = ConfigService.getConfig('API_BASE_URL');
 let initialRecipes: Recipe[] = [];
 const recipes = ref<Recipe[]>([]);
 API.get(
-    'http://localhost:8000/api/recipes',
+    apiBaseUrl + '/recipes',
     {},
     'cors'
 ).then((res: Recipe[]) => {
@@ -39,7 +40,7 @@ const recipesSearch: Ref<Recipe[]> = ref([]);
 const recipeAutocomplete = debounce(async (term: string) => {
   if (term && term.length >= 2) {
     recipes.value = await API.get(
-        'http://localhost:8000/api/recipes/autocomplete',
+        apiBaseUrl + '/recipes/autocomplete',
         {term},
         'cors'
     );

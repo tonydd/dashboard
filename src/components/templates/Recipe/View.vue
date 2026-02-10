@@ -147,6 +147,8 @@ import {RecipeIngredient} from "@/types/RecipeIngredient";
 import {RecipeStep} from "@/types/RecipeStep";
 import Stepper from "@/components/recipe/Stepper.vue";
 import imageUrl from '@/assets/chef.png';
+import ConfigService from "@/services/ConfigService.js";
+const apiBaseUrl = ConfigService.getConfig('API_BASE_URL');
 
 const props = withDefaults(
     defineProps<{ parameters: { recipeId?: number, step?: string } }>(),
@@ -160,7 +162,7 @@ const recipe = ref<Recipe | null>(null);
 
 const checkedIngredients = ref<boolean[]>([]);
 onBeforeMount(async () => {
-  const data = await API.get('http://localhost:8000/api/recipe/' + props.parameters.recipeId, {}, 'cors');
+  const data = await API.get(apiBaseUrl + '/recipe/' + props.parameters.recipeId, {}, 'cors');
   checkedIngredients.value = data.recipeIngredients.map(() => false);
   recipe.value = data;
 

@@ -155,6 +155,7 @@ import {RecipeStep} from "@/types/RecipeStep";
 import {Unit} from "@/types/Unit";
 import {Tag} from "@/types/Tag";
 import debounce from 'lodash-es/debounce';
+import ConfigService from "@/services/ConfigService.js";
 
 const currentRecipe: Ref<Recipe> = ref({
   id: null,
@@ -201,6 +202,7 @@ const addStep = (): void => {
 }
 
 const currentQuantity: Ref<number> = ref(0);
+const apiBaseUrl = ConfigService.getConfig('API_BASE_URL');
 
 const ingredientsLoading: Ref<boolean> = ref(false);
 const ingredientsSearch: Ref<Ingredient[]> = ref([]);
@@ -209,7 +211,7 @@ const ingredientAutocomplete = debounce(async (term: string) => {
   if (term && term.length >= 2) {
     ingredientsLoading.value = true;
     ingredientsSearch.value = await API.get(
-        'http://localhost:8000/api/ingredients/autocomplete',
+        apiBaseUrl + '/ingredients/autocomplete',
         {term},
         'cors'
     );
@@ -229,7 +231,7 @@ const unitsSearch: Ref<Unit[]> = ref([]);
 const unitAutocomplete = debounce(async (term: string) => {
   if (term && term.length >= 1) {
     unitsSearch.value = await API.get(
-        'http://localhost:8000/api/units/autocomplete',
+        apiBaseUrl + '/units/autocomplete',
         {term},
         'cors'
     );
@@ -246,14 +248,14 @@ const updateUnit = (unitId: number): void => {
 const tagsAutocompleteField = ref();
 const tags: Ref<Tag[]> = ref([]);
 API
-    .get('http://localhost:8000/api/tags', {}, 'cors')
+    .get(apiBaseUrl + '/tags', {}, 'cors')
     .then(res => tags.value = res);
 const tagsForAutocomplete: ComputedRef<Tag[]> = computed(() => {
   return tags.value.filter(tag => !currentRecipe.value.tags.find(tagg => tagg.id === tag.id));
 });
 
 const postRecipe = () => {
-  API.post('http://localhost:8000/api/recipes', currentRecipe.value, 'cors')
+  API.post(apiBaseUrl + '/recipes', currentRecipe.value, 'cors')
       .then(res => {
         console.log(res);
         window.location.reload();
