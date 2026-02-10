@@ -130,13 +130,13 @@
       <template v-else-if="currentStep === 'conclusion'">
         <h2>Bon appétit !</h2>
 
-        <img :src="imageUrl" style="max-width: 50%"/>
+        <img :src="imageUrl" alt="Chefs kiss" style="max-width: 50%"/>
 
         <div class="row mt-4 flex-center-horizontal align-center">
           <v-btn class="big-btn back mr-4" @click="currentStep = recipe.recipeSteps.length - 1">
             ←
           </v-btn>
-          <v-btn class="big-btn mr-4" @click="navigateTo('/tablet')">
+          <v-btn class="big-btn mr-4" @click="navigateTo('tablet')">
             Revenir à l'écran principal
           </v-btn>
         </div>
@@ -154,7 +154,6 @@ import {RecipeStep} from "@/types/RecipeStep";
 import Stepper from "@/components/recipe/Stepper.vue";
 import imageUrl from '@/assets/chef.png';
 import ConfigService from "@/services/ConfigService.js";
-import Link from "@/components/core/Link.vue";
 
 const apiBaseUrl = ConfigService.getConfig('API_BASE_URL');
 
@@ -240,7 +239,6 @@ const navigateTo = inject<Function>('navigateTo');
 .custom-checkbox {
   width: 36px;
   height: 36px;
-  margin-right: 12px;
   accent-color: green; /* couleur de la coche */
   transform: scale(1.3);
   margin-right: 32px;
