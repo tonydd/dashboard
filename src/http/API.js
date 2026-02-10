@@ -26,7 +26,7 @@ const API = {
             headers: {
                 'Content-Type': 'application/json',
             },
-            mode: mode // Ajout du mode paramétrable ici
+            mode: mode
         };
 
         if (data) {

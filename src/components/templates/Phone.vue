@@ -8,7 +8,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import Solar from "@/components/Solar.vue";
 import DateTime from "@/components/DateTime.vue";
 import WaterHeater from "@/components/WaterHeater.vue";

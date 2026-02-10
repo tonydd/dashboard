@@ -53,3 +53,7 @@ services:
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+
+    App\Utils\SearchSlugger:
+        public: true
+    Symfony\Component\String\Slugger\SluggerInterface: '@App\Utils\SearchSlugger'
