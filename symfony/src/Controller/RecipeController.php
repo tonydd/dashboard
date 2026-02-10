@@ -49,6 +49,14 @@ class RecipeController extends AbstractController
         return $this->json($this->serializer->normalize($recipe, 'json', ['groups' => 'recipe:detail']));
     }
 
+    #[Route('/api/recipe/{id}', name: 'recipe_delete', methods: ['DELETE'])]
+    public function deleteRecipe(Recipe $recipe): JsonResponse
+    {
+        $this->entityManager->remove($recipe);
+        $this->entityManager->flush();
+        return $this->json($this->serializer->normalize(['success' => true], 'json'));
+    }
+
     #[Route('/api/recipes/autocomplete', name: 'recipes_autocomplete', methods: ['GET'])]
     public function getRecipesAutocomplete(Request $request, RecipeRepository $recipeRepository): JsonResponse
     {
