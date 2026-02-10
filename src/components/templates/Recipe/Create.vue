@@ -149,6 +149,7 @@
 import {computed, ComputedRef, Ref, ref} from "vue";
 import {Ingredient} from "@/types/Ingredient";
 import API from "@/http/API";
+import {CacheType, LocalCache} from "@/services/LocalCache";
 import {Recipe} from "@/types/Recipe";
 import {RecipeIngredient} from "@/types/RecipeIngredient";
 import {RecipeStep} from "@/types/RecipeStep";
@@ -207,14 +208,25 @@ const apiBaseUrl = ConfigService.getConfig('API_BASE_URL');
 const ingredientsLoading: Ref<boolean> = ref(false);
 const ingredientsSearch: Ref<Ingredient[]> = ref([]);
 const ingredientsAutocompleteField = ref();
+const localStorageCache = new LocalCache('CreateRecipeUnit', CacheType.local);
+const sessionCache = new LocalCache('CreateRecipeIngredients', CacheType.memory);
+
+
 const ingredientAutocomplete = debounce(async (term: string) => {
   if (term && term.length >= 2) {
+    const cached = sessionCache.get(term);
+    if (cached) {
+      ingredientsSearch.value = cached;
+      return;
+    }
+
     ingredientsLoading.value = true;
     ingredientsSearch.value = await API.get(
         apiBaseUrl + '/ingredients/autocomplete',
         {term},
         'cors'
     );
+    sessionCache.set(term, ingredientsSearch.value);
     ingredientsLoading.value = false;
   } else {
     ingredientsSearch.value = [];
@@ -229,12 +241,19 @@ const updateIngredient = (ingredientId: number): void => {
 
 const unitsSearch: Ref<Unit[]> = ref([]);
 const unitAutocomplete = debounce(async (term: string) => {
+  const cached = localStorageCache.get(term);
+  if (cached) {
+    unitsSearch.value = cached;
+    return;
+  }
+
   if (term && term.length >= 1) {
     unitsSearch.value = await API.get(
         apiBaseUrl + '/units/autocomplete',
         {term},
         'cors'
     );
+    localStorageCache.set(term, unitsSearch.value);
   } else {
     unitsSearch.value = [];
   }
