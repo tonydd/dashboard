@@ -97,7 +97,13 @@
       <v-card prepend-icon="mdi-stove" title="Étapes" class="mb-2">
         <v-card-item v-for="(_, i) in currentRecipe.recipeSteps">
           <div class="row">
-            <v-textarea v-model="currentRecipe.recipeSteps[i].description" label="Instructions" outlined></v-textarea>
+            <div class="column" style="min-width: 92%">
+              <v-textarea v-model="currentRecipe.recipeSteps[i].description" label="Instructions" outlined></v-textarea>
+            </div>
+            <div class="column align-center flex-center-vertical flex-center-horizontal" style="max-width: 8%">
+              <v-btn :disabled="i === 0" @click="push(direction.up, i)">↑</v-btn>
+              <v-btn :disabled="i === currentRecipe.recipeSteps.length - 1" @click="push(direction.down, i)">↓</v-btn>
+            </div>
           </div>
           <div class="row">
             <v-card-item v-for="(ingredient, j) in currentRecipe.recipeIngredients" :key="j">
@@ -209,7 +215,7 @@ const ingredientsLoading: Ref<boolean> = ref(false);
 const ingredientsSearch: Ref<Ingredient[]> = ref([]);
 const ingredientsAutocompleteField = ref();
 const localStorageCache = new LocalCache('CreateRecipeUnit', CacheType.local);
-const sessionCache = new LocalCache('CreateRecipeIngredients', CacheType.memory);
+const sessionCache = new LocalCache('CreateRecipeIngredients', CacheType.session);
 
 
 const ingredientAutocomplete = debounce(async (term: string) => {
@@ -282,6 +288,35 @@ const postRecipe = () => {
       .catch(err => console.error(err))
   ;
 };
+
+enum direction {
+  up = 'up',
+  down = 'down',
+}
+
+const push = (direction: direction, index: number) => {
+  debugger;
+  const atCurrentIndex = currentRecipe.value.recipeSteps[index];
+  const targetIndex = direction === 'up' ? (index - 1) : (index + 1);
+  const atTargetIndex = currentRecipe.value.recipeSteps[targetIndex];
+  let newSteps: RecipeStep[] = [];
+
+  for (let i = 0; i < currentRecipe.value.recipeSteps.length; i++) {
+    switch (true) {
+      case i === index:
+        newSteps.push(atTargetIndex);
+        break
+      case i === targetIndex:
+        newSteps.push(atCurrentIndex);
+        break;
+      default:
+        newSteps.push(currentRecipe.value.recipeSteps[i]);
+        break;
+    }
+  }
+
+  currentRecipe.value.recipeSteps = newSteps;
+}
 </script>
 
 <style scoped>
