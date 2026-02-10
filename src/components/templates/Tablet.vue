@@ -28,11 +28,16 @@
     <div class="column" style="max-width: 12%">
       <FrenchFuel :station-id="ConfigService.getConfig('FUEL_API_STATION_ID')" :name="ConfigService.getConfig('FUEL_API_STATION_NAME')" />
     </div>
-    <div class="column" style="padding-left: 20px; max-width: 55%;">
+    <div class="column" style="padding-left: 20px; max-width: 35%;">
       <SsfNews/>
     </div>
-    <div class="column" style="padding-left: 20px;">
+    <div class="column" style="padding-left: 20px; max-width: 50%">
       <CustomMessage id="daily" />
+    </div>
+    <div class="column" style="padding-left: 20px;">
+      <a id="torecipe" href="/recipe/list">
+        <h1>Liste des recettes 🍽️</h1>
+      </a>
     </div>
   </div>
 
@@ -62,3 +67,18 @@ import CustomMessage from "@/components/CustomMessage.vue";
 import ConfigService from "@/services/ConfigService.js";
 import WaterQuality from "@/components/WaterQuality.vue";
 </script>
+
+<style scoped>
+#torecipe {
+  border: 1px solid white;
+  border-radius: 5px;
+  text-align: center;
+  height: 100px;
+  color: white;
+}
+#torecipe h1 {
+  margin: auto;
+  text-align: center;
+  margin-top: 0.6em;
+}
+</style>

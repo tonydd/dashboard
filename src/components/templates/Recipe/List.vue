@@ -1,6 +1,6 @@
 <template>
 <div class="column flex-center-horizontal">
-  <h1>Liste des recettes</h1>
+  <h1>Liste des recettes&nbsp;<a href="/tablet">← Revenir à l'écran principal</a></h1>
   <v-text-field id="search" @update:model-value="recipeAutocomplete" placeholder="Commencez à saisir pour chercher des recettes"></v-text-field>
 
   <v-list>
