@@ -72,3 +72,63 @@ a,
     padding-left: 20px;
 }
 
+.col-full {
+  width: 100%;
+  max-width: 100%;
+}
+
+.col-border-right {
+  border-right: 1px solid white;
+}
+
+.col-70 {
+  max-width: 70%;
+}
+
+.col-50 {
+  max-width: 50%;
+}
+
+.col-45 {
+  max-width: 45%;
+}
+
+.col-40 {
+  max-width: 45%;
+}
+
+.col-30 {
+  max-width: 30%;
+}
+
+.col-10 {
+  max-width: 10%;
+}
+
+.col-5 {
+  max-width: 5%;
+}
+.col-3 {
+  max-width: 3%;
+}
+
+.col-7 {
+  max-width: 7%;
+}
+
+.mb-4 {
+  margin-bottom: 10px;
+}
+
+.mb-2 {
+  margin-bottom: 5px;
+}
+
+.mr-4 {
+  margin-right: 4ch;
+}
+
+.clickable:hover {
+  cursor: pointer;
+}
+
