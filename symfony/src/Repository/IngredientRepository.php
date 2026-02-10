@@ -24,7 +24,7 @@ class IngredientRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('i')
             ->andWhere('i.slug LIKE :term')
-            ->setParameter('term', $term . '%')
+            ->setParameter('term', '%' . $term . '%')
             ->getQuery()
             ->getResult();
     }

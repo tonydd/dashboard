@@ -33,7 +33,7 @@ class RecipeRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('r')
             ->andWhere('r.slug LIKE :term')
-            ->setParameter('term', $term . '%')
+            ->setParameter('term', '%' . $term . '%')
             ->getQuery()
             ->getResult();
     }
