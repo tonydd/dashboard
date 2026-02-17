@@ -122,7 +122,7 @@ class RecipeController extends AbstractController
             $ingredients = $this->ingredientRepository->findBy(['id' => $ingredientIds]);
             $units = $this->unitRepository->findBy(['id' => $unitIds]);
 
-            $recipe = new Recipe()
+            $recipe = (new Recipe())
                 ->setName($recipeDto->name)
                 ->setSlug($slug)
                 ->setDescription($recipeDto->description);
@@ -132,7 +132,7 @@ class RecipeController extends AbstractController
             }
 
             foreach ($recipeIngredients as $recipeIngredientToCreate) {
-                $recipeIngredientEntity = new RecipeIngredient()
+                $recipeIngredientEntity = (new RecipeIngredient())
                     ->setIngredient(\array_find($ingredients, static fn(Ingredient $ingredient): bool => $ingredient->getId() === $recipeIngredientToCreate['ingredient']['id']))
                     ->setUnit(\array_find($units, static fn(Unit $unit): bool => $unit->getId() === $recipeIngredientToCreate['unit']['id']))
                     ->setQuantity($recipeIngredientToCreate['quantity'] ?? 1);;
@@ -141,7 +141,7 @@ class RecipeController extends AbstractController
             }
 
             foreach ($recipeDto->recipeSteps as $position => $step) {
-                $stepEntity = new RecipeStep()
+                $stepEntity = (new RecipeStep())
                     ->setDescription($step['description'] ?? '')
                     ->setPosition($position);
 
@@ -183,7 +183,7 @@ class RecipeController extends AbstractController
             return $ingredient;
         }
 
-        $ingredient = new Ingredient()->setName($name)->setSlug($this->slugger->slug($name))->setEmoji($ingredientData['emoji'] ?? null);
+        $ingredient = (new Ingredient())->setName($name)->setSlug($this->slugger->slug($name))->setEmoji($ingredientData['emoji'] ?? null);
         $this->entityManager->persist($ingredient);
         $this->entityManager->flush();
         return $ingredient;
@@ -217,7 +217,7 @@ class RecipeController extends AbstractController
             return $unit;
         }
 
-        $unit = new Unit()->setName($name)->setSlug($this->slugger->slug($name))->setCode($unitData['code'] ?? null);
+        $unit = (new Unit())->setName($name)->setSlug($this->slugger->slug($name))->setCode($unitData['code'] ?? null);
         $this->entityManager->persist($unit);
         $this->entityManager->flush();
         return $unit;
