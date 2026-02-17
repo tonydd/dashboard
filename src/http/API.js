@@ -33,12 +33,16 @@ const API = {
             options.body = JSON.stringify(data);
         }
 
+        let responseHeaders = {};
         return fetch(url, options)
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`API request failed with status ${response.status}`);
                 }
                 return response.json();
+            })
+            .then(json => {
+                return json;
             })
             .catch(error => {
                 throw new Error(`API request error: ${error.message}`);

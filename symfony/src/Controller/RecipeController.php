@@ -32,6 +32,7 @@ class RecipeController extends AbstractController
         private readonly KernelInterface        $kernel,
         private readonly EntityManagerInterface $entityManager,
         private readonly IngredientRepository   $ingredientRepository,
+        private readonly UnitRepository         $unitRepository,
     )
     {
     }
@@ -75,11 +76,12 @@ class RecipeController extends AbstractController
     #[Route('/api/recipes', name: 'recipe_create', methods: ['POST'])]
     public function createRecipe(
         RecipeRepository               $recipeRepository,
-        UnitRepository                 $unitRepository,
         TagRepository                  $tagRepository,
         #[MapRequestPayload] RecipeDto $recipeDto,
     ): JsonResponse
     {
+        $this->entityManager->beginTransaction();
+
         if ($recipeDto->id !== null) {
             return $this->json(['success' => false, 'message' => 'La recette existe déjà'], 400);
         }
@@ -93,9 +95,9 @@ class RecipeController extends AbstractController
 
             $tagIds = array_column($recipeDto->tags, 'id');
             $ingredientIds = $unitIds = [];
-            $recipeIngredients = $recipeDto->recipeIngredients;
+            $recipeIngredients = [];
 
-            foreach ($recipeIngredients as &$recipeIngredient) {
+            foreach ($recipeDto->recipeIngredients as $recipeIngredient) {
                 $id = $recipeIngredient['ingredient']['id'] ?? null;
                 if ($id !== null) {
                     $ingredientIds[] = $id;
@@ -113,12 +115,14 @@ class RecipeController extends AbstractController
                     $unitIds[] = $newUnit->getId();
                     $recipeIngredient['unit']['id'] = $newUnit->getId();
                 }
+
+                $recipeIngredients[] = $recipeIngredient;
             }
 
             $ingredients = $this->ingredientRepository->findBy(['id' => $ingredientIds]);
-            $units = $unitRepository->findBy(['id' => $unitIds]);
+            $units = $this->unitRepository->findBy(['id' => $unitIds]);
 
-            $recipe = (new Recipe())
+            $recipe = new Recipe()
                 ->setName($recipeDto->name)
                 ->setSlug($slug)
                 ->setDescription($recipeDto->description);
@@ -127,17 +131,17 @@ class RecipeController extends AbstractController
                 $recipe->addTag($tag);
             }
 
-            foreach ($recipeIngredients as $recipeIngredient) {
-                $recipeIngredientEntity = (new RecipeIngredient())
-                    ->setIngredient(\array_find($ingredients, static fn(Ingredient $ingredient): bool => $ingredient->getId() === $recipeIngredient['ingredient']['id']))
-                    ->setUnit(\array_find($units, static fn(Unit $unit): bool => $unit->getId() === $recipeIngredient['unit']['id']))
-                    ->setQuantity($recipeIngredient['quantity'] ?? 1);;
+            foreach ($recipeIngredients as $recipeIngredientToCreate) {
+                $recipeIngredientEntity = new RecipeIngredient()
+                    ->setIngredient(\array_find($ingredients, static fn(Ingredient $ingredient): bool => $ingredient->getId() === $recipeIngredientToCreate['ingredient']['id']))
+                    ->setUnit(\array_find($units, static fn(Unit $unit): bool => $unit->getId() === $recipeIngredientToCreate['unit']['id']))
+                    ->setQuantity($recipeIngredientToCreate['quantity'] ?? 1);;
 
                 $recipe->addRecipeIngredient($recipeIngredientEntity);
             }
 
             foreach ($recipeDto->recipeSteps as $position => $step) {
-                $stepEntity = (new RecipeStep())
+                $stepEntity = new RecipeStep()
                     ->setDescription($step['description'] ?? '')
                     ->setPosition($position);
 
@@ -152,9 +156,11 @@ class RecipeController extends AbstractController
 
             $this->entityManager->persist($recipe);
             $this->entityManager->flush();
+            $this->entityManager->commit();
 
             return $this->json(['success' => true]);
         } catch (\Throwable $t) {
+            $this->entityManager->rollback();
             $this->logger->error($t);
             $payload = ['success' => false, 'message' => 'Erreur interne. Veuillez ré-essayer plus tard.'];
             if ($this->kernel->getEnvironment() === 'dev') {
@@ -177,7 +183,7 @@ class RecipeController extends AbstractController
             return $ingredient;
         }
 
-        $ingredient = (new Ingredient())->setName($name)->setSlug($this->slugger->slug($name))->setEmoji($ingredientData['emoji'] ?? null);
+        $ingredient = new Ingredient()->setName($name)->setSlug($this->slugger->slug($name))->setEmoji($ingredientData['emoji'] ?? null);
         $this->entityManager->persist($ingredient);
         $this->entityManager->flush();
         return $ingredient;
@@ -185,10 +191,17 @@ class RecipeController extends AbstractController
 
     private function tryGetIngredient(string $name): ?Ingredient
     {
+        $slug = $this->slugger->slug($name);
+        $found = $this->ingredientRepository->findOneBy(['slug' => $slug]);
+        if ($found) {
+            return $found;
+        }
+
         $found = $this->ingredientRepository->getAutocompleteResults($this->slugger->slug($name));
         if (count($found) === 1) {
             return $found[0];
         }
+
         return null;
     }
 
@@ -199,9 +212,30 @@ class RecipeController extends AbstractController
             throw new \InvalidArgumentException('Unit name is null');
         }
 
-        $unit = (new Unit())->setName($name)->setSlug($this->slugger->slug($name))->setCode($unitData['code'] ?? null);
+        $unit = $this->tryGetUnit($name);
+        if ($unit) {
+            return $unit;
+        }
+
+        $unit = new Unit()->setName($name)->setSlug($this->slugger->slug($name))->setCode($unitData['code'] ?? null);
         $this->entityManager->persist($unit);
         $this->entityManager->flush();
         return $unit;
+    }
+
+    private function tryGetUnit(string $name): ?Unit
+    {
+        $slug = $this->slugger->slug($name);
+        $found = $this->unitRepository->findOneBy(['slug' => $slug]);
+        if ($found) {
+            return $found;
+        }
+
+        $found = $this->unitRepository->getAutocompleteResults($this->slugger->slug($name));
+        if (count($found) === 1) {
+            return $found[0];
+        }
+
+        return null;
     }
 }
