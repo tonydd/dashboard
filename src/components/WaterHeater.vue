@@ -26,13 +26,19 @@ export default {
   methods: {
     getWaterHeaterData() {
       fetch(ConfigService.getConfig('WATER_HEATER_API_URL'), {method: 'GET', mode: 'cors'})
-          .then((res) => res.json())
+          .then((res) => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+          })
           .then(res => {
             if ('error' in res) {
-              console.error(res);
+              console.error('Water heater error:', res.error);
               return;
             }
             this.waterHeaterData = res;
+          })
+          .catch(err => {
+            console.error('Water heater API error:', err);
           });
     },
     showDialog() {

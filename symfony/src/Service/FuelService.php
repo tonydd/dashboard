@@ -30,7 +30,6 @@ final readonly class FuelService
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             'Accept: application/json',
-            'Cache-Control: no-cache',
         ]);
 
         $response = curl_exec($ch);
@@ -41,7 +40,7 @@ final readonly class FuelService
         $fuelData = $data['Fuels'];
         $fuels = [];
         foreach ($fuelData as $fuel) {
-            if (in_array($fuel['short_name'], ['Gazole', 'SP95-E10', 'SP98'])) {
+            if (in_array($fuel['shortName'], ['Gazole', 'SP95-E10', 'SP98'])) {
 
                 $fuelStat = $this->fuelStatRepository->findLastByType(FuelType::from($fuel['picto']));
                 if ($fuelStat && $fuelStat->getPrice() === $fuel['Price']['value']) {

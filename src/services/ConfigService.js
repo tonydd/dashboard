@@ -12,17 +12,20 @@ export default class ConfigService {
         return value || defaultValue;
     }
 
-    static getIntervalConfig(name, defaultValue = null) {
+    static getIntervalConfig(name, defaultValue = 60000) { // 60 secondes par défaut
         const value = import.meta.env[`${ConfigService.VITE_PREFIX}${name}`];
         if (!value) {
+            console.warn(`Config interval ${name} not found, using default: ${defaultValue}ms`);
             return defaultValue;
         }
 
         const explode = value.split(' ');
         if (explode.length !== 2) {
+            console.warn(`Config interval ${name} has invalid format, using default: ${defaultValue}ms`);
             return defaultValue;
         }
 
-        return DateService.getDeferInterval(explode[0], explode[1]) || defaultValue;
+        const interval = DateService.getDeferInterval(explode[0], explode[1]);
+        return interval || defaultValue;
     }
 }

@@ -3,9 +3,8 @@
     <div class="row">
       <label style="font-weight: bold">Actus SSF</label>
     </div>
-    <div class="row" v-for="(newsItem, idx) in news" @click="() => clickNews(idx)">
-      <h6
-      >{{ newsItem.title }}</h6>
+    <div class="row" v-for="(newsItem, idx) in news" @click="() => clickNews(idx)" style="cursor: pointer; margin-bottom: 12px;">
+      <h6>{{ newsItem.title }}</h6>
     </div>
   </div>
 
@@ -15,22 +14,27 @@
     <v-card
         :title="newsTitle"
     >
-      <v-card-text>
-        <v-row>
-          <v-col cols="12">
-
-            <!--<iframe :src="'https://www.soultzsousforets.fr/' + news[currentIndex].link" style="width: 100%; height: auto" />
-            -->
-            <div v-html="newsHtml" />
-          </v-col>
-        </v-row>
+      <v-card-text style="padding: 0; height: calc(100vh - 120px); position: relative;">
+        <v-btn
+            icon="mdi-close"
+            size="x-large"
+            variant="plain"
+            @click="dialog = false"
+            style="position: absolute; top: 8px; right: 8px; z-index: 1000;"
+        ></v-btn>
+        <iframe 
+          v-if="newsLink"
+          :src="newsLink" 
+          style="width: 100%; height: 100%; border: none;"
+          title="News content"
+        />
       </v-card-text>
     </v-card>
 
     <v-card>
       <v-card-actions style="justify-content: space-between">
         <v-btn
-            text="Fermer"
+            text="Fermer (Esc)"
             variant="plain"
             @click="dialog = false"
         ></v-btn>
@@ -39,98 +43,61 @@
   </v-dialog>
 </template>
 <script setup>
-import {onMounted, onUnmounted, ref, watch} from "vue";
+import {onMounted, ref} from "vue";
 
-const jqueryLoaded = ref(false); // État pour suivre le chargement de jQuery
 const news = ref([]);
 const dialog = ref(false);
 const maxNews = 3;
-const loadJQuery = () => {
-  return new Promise((resolve, reject) => {
-    if (window.jQuery) {
-      // jQuery déjà chargé
-      console.log('jQuery déjà chargé');
-      resolve();
-    } else {
-      // Charger dynamiquement le script
-      const script = document.createElement("script");
-      script.src = "https://code.jquery.com/jquery-3.7.1.min.js"; // Version à adapter
-      script.onload = () => {
-        console.log("jQuery chargé avec succès !");
-        resolve();
-      };
-      script.onerror = (err) => {
-        console.error("Erreur lors du chargement de jQuery :", err);
-        reject(err);
-      };
-      document.head.appendChild(script);
-    }
-  });
-};
-
-// Charger jQuery lorsque le composant est monté
-onMounted(() => {
-  loadJQuery().then(() => {
-    jqueryLoaded.value = true;
-  });
-});
-
-// Nettoyage si nécessaire (par exemple, suppression de jQuery)
-onUnmounted(() => {
-  const script = document.querySelector(
-      'script[src="https://code.jquery.com/jquery-3.7.1.min.js"]'
-  );
-  if (script) {
-    script.remove();
-    delete window.jQuery;
-  }
-});
-
-const fetchNews = async () => {
-  const page = await fetch('https://www.soultzsousforets.fr/Actus/');
-  const html = await page.text();
-  const $html = $(html), $rows = $html.find('.row.actualite');
-  for (let i = 0; i < maxNews; i++) {
-    const $row = $($rows[i]);
-    const $link = $row.find('h3 > a');
-    const title = $link.text(), link = $link.attr('href');
-
-    const $container = $row.find('h3').parent();
-    const description = Array.from($container.get(0).childNodes)
-        .filter(node => node.nodeType === 3) // Nœuds texte seulement
-        .map(node => node.nodeValue.trim()) // Récupère le texte des nœuds
-        .join("");
-
-    news.value.push({
-      title,
-      description,
-      link,
-    });
-  }
-};
-
-let currentIndex = ref(0);
-let newsHtml = ref('');
 let newsTitle = ref('');
-const clickNews = async (idx) => {
-  const f = await fetch('https://www.soultzsousforets.fr/' + news.value[idx].link);
-  const html = await f.text();
-  const $html = $(html);
+let newsLink = ref('');
 
-  const $main = $html.find('main');
-  $main.find('div.page-header:first-child, div.sharing, div.page-content.list-actus, a')
-      .remove();
+const parseRSSFeed = async () => {
+  try {
+    const response = await fetch('https://www.soultzsousforets.fr/rss/actus.php');
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const rssText = await response.text();
+    
+    // Parser le flux RSS
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(rssText, 'text/xml');
+    
+    // Vérifier les erreurs de parsing
+    if (xmlDoc.getElementsByTagName('parsererror').length > 0) {
+      console.error('Erreur lors du parsing du RSS');
+      return;
+    }
+    
+    // Extraire les items du flux
+    const items = xmlDoc.getElementsByTagName('item');
+    
+    for (let i = 0; i < Math.min(maxNews, items.length); i++) {
+      const item = items[i];
+      
+      const title = item.getElementsByTagName('title')[0]?.textContent || '';
+      const link = item.getElementsByTagName('link')[0]?.textContent || '';
+      
+      news.value.push({
+        title,
+        link,
+      });
+    }
+  } catch (error) {
+    console.error('Erreur lors du chargement du flux RSS:', error);
+  }
+};
 
-  newsTitle.value = $main.find('.page-header > h1').text();
-  $main.find('.page-header > h1').remove();
-  newsHtml.value = $main.html();
+const clickNews = (idx) => {
+  const newsItem = news.value[idx];
+  newsTitle.value = newsItem.title;
+  newsLink.value = newsItem.link;
+  
   dialog.value = true;
 }
 
-watch(jqueryLoaded, (nv) => {
-  if (nv) {
-    fetchNews();
-  }
+onMounted(() => {
+  parseRSSFeed();
 });
 </script>
 

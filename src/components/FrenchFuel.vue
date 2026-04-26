@@ -21,9 +21,21 @@ onMounted(() => {
 });
 
 async function fetchFuels() {
-  let response = await fetch(ConfigService.getConfig("FUEL_API_URL"), { method: "GET", mode: "cors" });
-  response = await response.json();
-  fuels.value = Object.values(response);
+  try {
+    let response = await fetch(ConfigService.getConfig("FUEL_API_URL"), { method: "GET", mode: "cors" });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const data = await response.json();
+    if (data && typeof data === 'object') {
+      fuels.value = Object.values(data);
+    } else {
+      console.error('Invalid fuel data format');
+    }
+  } catch (error) {
+    console.error('Fuel API error:', error);
+    fuels.value = [];
+  }
 }
 
 function showAsDayAndMonth(isoDateString) {

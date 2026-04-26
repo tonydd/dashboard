@@ -20,9 +20,21 @@ onMounted(() => {
 });
 
 async function fetchWaterQuality() {
-  let response = await fetch(ConfigService.getConfig("WATER_QUALITY_API_URL"), { method: "GET", mode: "cors" });
-  response = await response.json();
-  waterQuality.value = response;
+  try {
+    let response = await fetch(ConfigService.getConfig("WATER_QUALITY_API_URL"), { method: "GET", mode: "cors" });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const data = await response.json();
+    if (data && typeof data === 'object') {
+      waterQuality.value = data;
+    } else {
+      console.error('Invalid water quality data format');
+    }
+  } catch (error) {
+    console.error('Water quality API error:', error);
+    waterQuality.value = null;
+  }
 }
 
 const color = computed(() => {

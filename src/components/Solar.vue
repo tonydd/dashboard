@@ -24,9 +24,22 @@ export default {
     fetchSolarOutput() {
       const now = DateService.now();
       if (SolarService.isSolarProductionPeriod(now)) {
-        fetch(ConfigService.getConfig('SOLAR_API_URL'), {mode: "cors"}).then(res => res.json()).then(res => {
-          this.solarData = (res.production / 100) + ' W';
-        });
+        fetch(ConfigService.getConfig('SOLAR_API_URL'), {mode: "cors"})
+          .then(res => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+          })
+          .then(res => {
+            if (res && res.production !== undefined) {
+              this.solarData = (res.production / 100) + ' W';
+            } else {
+              this.solarData = 'ERROR';
+            }
+          })
+          .catch(err => {
+            console.error('Solar API error:', err);
+            this.solarData = 'ERROR';
+          });
       } else {
         this.solarData = 'OFFLINE';
       }
