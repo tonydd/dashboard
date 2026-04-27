@@ -25,7 +25,7 @@
 import ConfigService from '@/services/ConfigService';
 import { inject, ref } from 'vue';
 
-const src = ref(ConfigService.getConfig('BACKGROUND_URL') + '?v=' + Date.now());
+const src = ref(ConfigService.getConfig('BACKGROUND_URL') + '?v=' + (new Date()).getDay());
 
 const onImageLoaded = () => {
   console.log('Background image loaded successfully from:', src.value);
