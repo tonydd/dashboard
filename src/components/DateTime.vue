@@ -6,7 +6,8 @@ export default {
   data() {
     return {
       date: new Date().toLocaleDateString(),
-      time: new Date().toLocaleTimeString()
+      time: new Date().toLocaleTimeString(),
+      navigateTo: () => window.location.replace("/slideshow")
     };
   },
   mounted() {
@@ -21,7 +22,7 @@ export default {
 </script>
 
 <template>
-  <div class="flex-center-vertical flex-center-horizontal">
+  <div class="flex-center-vertical flex-center-horizontal" @click="navigateTo('slideshow')">
     <h2>{{ date }}</h2>
     <h2>{{ time }}</h2>
   </div>
