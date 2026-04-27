@@ -39,7 +39,7 @@ function checkParameterizedRoute (path: string): { component: () => Promise<{ de
       }
     }
 
-    console.log('search ', '/src/components/templates/' + route.component, components);
+    //console.log('search ', '/src/components/templates/' + route.component, components);
     return {
       component: components['/src/components/templates/' + route.component],
       bag
@@ -57,7 +57,7 @@ function checkPath(path: string): () => Promise<{ default: Component }> {
   path = elements.join('/');
 
   const match = list.find(currentPath => currentPath.endsWith(`/${path}.vue`));
-  console.log('Searched for endsWith', path, 'in', list, 'matched', match);
+  //console.log('Searched for endsWith', path, 'in', list, 'matched', match);
 
   if (!match) {
     throw new Error(`"${path}" : Route introuvable`);

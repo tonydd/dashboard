@@ -1,6 +1,6 @@
 <template>
 <div class="column flex-center-horizontal">
-  <h1>Liste des recettes&nbsp;<a href="/tablet">← Revenir à l'écran principal</a></h1>
+  <h1>Liste des recettes&nbsp;<a href="/tablet" v-if="isTablet">← Revenir à l'écran principal</a></h1>
   <v-text-field id="search" @update:model-value="recipeAutocomplete" placeholder="Commencez à saisir pour chercher des recettes"></v-text-field>
 
   <v-list>
@@ -53,6 +53,8 @@ const currentRecipe: Ref <Recipe | null> = ref(null);
 const updateRecipe = (recipeId: number): void => {
   //currentRecipe.value = recipesSearch.value.find((recipe: Recipe) => recipe.id === recipeId);
 }
+
+const isTablet = localStorage.getItem('isTablet') === 'true';
 </script>
 
 <style scoped>

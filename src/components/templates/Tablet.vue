@@ -66,6 +66,13 @@ import Timer from "@/components/Timer.vue";
 import CustomMessage from "@/components/CustomMessage.vue";
 import ConfigService from "@/services/ConfigService.js";
 import WaterQuality from "@/components/WaterQuality.vue";
+import DateService from "@/services/DateService";
+
+window.setTimeout(() => {
+  window.location.replace("/slideshow");
+}, DateService.getDeferInterval(15, 'minute'));
+
+localStorage.setItem('isTablet', 'true');
 </script>
 
 <style scoped>

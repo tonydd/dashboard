@@ -20,6 +20,7 @@ services:
     container_name: app_php
     volumes:
       - ./symfony:/var/www/html
+      - /home/anthony/Archives/Diapo:/home/anthony/Archives/Diapo:ro
     working_dir: /var/www/html/public
     command: php -S 0.0.0.0:80 -t .
     ports:

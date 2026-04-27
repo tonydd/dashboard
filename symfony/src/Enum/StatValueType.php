@@ -9,4 +9,5 @@ enum StatValueType: string
     case Thermor = 'thermor';
 
     case WaterQuality = 'water_quality';
+    case Background = 'day_image';
 }
