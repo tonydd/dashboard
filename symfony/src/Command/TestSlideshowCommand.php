@@ -6,13 +6,12 @@ use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\String\Slugger\SluggerInterface;
 
 #[AsCommand(
     name: 'app:check-slideshow',
     description: 'Vérifie l\'état des slideshows.',
 )]
-class CheckSlideshowCommand extends Command
+class TestSlideshowCommand extends Command
 {
     public function __construct(
         private readonly Connection       $connection,
