@@ -3,7 +3,9 @@
 
   <div class="row">
     <div class="column">
-      <DateTime />
+      <div @click="gotoSlideshow()" style="cursor: pointer;">
+        <DateTime />
+      </div>
       <div class="row" style="min-height: 75px;">
         <div class="column flex-center-vertical flex-center-horizontal">
           <Timer icon="mdi-stove" name="timer-stove" />
@@ -67,11 +69,22 @@ import CustomMessage from "@/components/CustomMessage.vue";
 import ConfigService from "@/services/ConfigService.js";
 import WaterQuality from "@/components/WaterQuality.vue";
 import DateService from "@/services/DateService";
+import { onUnmounted } from "vue";
 
-window.setTimeout(() => {
-  window.location.replace("/slideshow");
+let timer;
+timer = window.setTimeout(() => {
+  gotoSlideshow();
 }, DateService.getDeferInterval(15, 'minute'));
 
+onUnmounted(() => {
+  if (timer) {
+    clearTimeout(timer);
+  }
+});
+
+const gotoSlideshow = () => {
+  window.location.replace("/slideshow");
+};
 localStorage.setItem('isTablet', 'true');
 </script>
 

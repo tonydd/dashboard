@@ -7,6 +7,9 @@
       @click="navigateTo('tablet')"
       crossorigin="anonymous"
   />
+  <div style="border-radius: 5px; background-color: rgba(0, 0, 0, 0.5); padding: 20px; position: absolute; top: 0%; left: 50%; transform: translate(-50%, 10%);">
+    <DateTime :fontSize="'50px'" />
+  </div>
 </template>
 
 <style scoped>
@@ -24,6 +27,7 @@
 <script setup lang="ts">
 import ConfigService from '@/services/ConfigService';
 import { inject, ref } from 'vue';
+import DateTime from '../DateTime.vue';
 
 const src = ref(ConfigService.getConfig('BACKGROUND_URL') + '?v=' + (new Date()).getDay());
 

@@ -3,6 +3,12 @@ import StringService from "@/services/StringService.js";
 import DateService from "@/services/DateService.js";
 export default {
   name: "DateTime",
+  props: {
+    fontSize: {
+      type: String,
+      default: '44px'
+    }
+  },
   data() {
     return {
       date: new Date().toLocaleDateString(),
@@ -22,7 +28,7 @@ export default {
 </script>
 
 <template>
-  <div class="flex-center-vertical flex-center-horizontal" @click="navigateTo('slideshow')">
+  <div class="flex-center-vertical flex-center-horizontal">
     <h2>{{ date }}</h2>
     <h2>{{ time }}</h2>
   </div>
@@ -31,6 +37,6 @@ export default {
 <style scoped>
   * {
     text-align: center;
-    font-size: 44px;
+    font-size: v-bind(fontSize);
   }
 </style>
