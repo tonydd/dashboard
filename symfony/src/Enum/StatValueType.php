@@ -8,6 +8,7 @@ enum StatValueType: string
     case Solar = 'solar';
     case Thermor = 'thermor';
     case ThermorSchedule = 'thermor_schedule';
+    case ThermorScheduleState = 'thermor_schedule_state';
 
     case WaterQuality = 'water_quality';
     case Background = 'day_image';

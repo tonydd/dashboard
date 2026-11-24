@@ -45,6 +45,45 @@ final readonly class ThermorScheduleService
         return false;
     }
 
+    public function hasOffPeakStateChanged(bool $isOffPeak): bool
+    {
+        $currentStatValue = $this->currentStatValueRepository->findOneBy([
+            'type' => StatValueType::ThermorScheduleState,
+        ]);
+
+        if ($currentStatValue === null) {
+            return true;
+        }
+
+        $value = $currentStatValue->getValue();
+        if (!is_array($value)
+            || array_keys($value) !== ['isOffPeak']
+            || !is_bool($value['isOffPeak'])
+        ) {
+            throw new \InvalidArgumentException('The stored Thermor schedule state is invalid.');
+        }
+
+        return $value['isOffPeak'] !== $isOffPeak;
+    }
+
+    public function rememberOffPeakState(bool $isOffPeak): void
+    {
+        $currentStatValue = $this->currentStatValueRepository->findOneBy([
+            'type' => StatValueType::ThermorScheduleState,
+        ]);
+
+        if ($currentStatValue === null) {
+            $currentStatValue = (new CurrentStatValue())
+                ->setType(StatValueType::ThermorScheduleState)
+                ->setValue(['isOffPeak' => $isOffPeak]);
+            $this->entityManager->persist($currentStatValue);
+        } else {
+            $currentStatValue->setValue(['isOffPeak' => $isOffPeak]);
+        }
+
+        $this->entityManager->flush();
+    }
+
     public function getSchedule(): array
     {
         $currentStatValue = $this->currentStatValueRepository->findOneBy([

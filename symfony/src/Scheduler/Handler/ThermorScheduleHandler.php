@@ -19,6 +19,11 @@ final readonly class ThermorScheduleHandler
     public function __invoke(ThermorScheduleMessage $message): void
     {
         $isOffPeak = $this->scheduleService->isOffPeakAt();
+        if (!$this->scheduleService->hasOffPeakStateChanged($isOffPeak)) {
+            return;
+        }
+
         $this->thermorService->reconcileAbsenceMode(!$isOffPeak);
+        $this->scheduleService->rememberOffPeakState($isOffPeak);
     }
 }

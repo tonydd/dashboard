@@ -52,6 +52,46 @@ final class ThermorScheduleServiceTest extends TestCase
         self::assertFalse($scheduleService->isOffPeakAt(new \DateTimeImmutable('2026-11-23 14:00:00', $timeZone)));
     }
 
+    public function testOffPeakStateChangesOnlyWhenStoredConditionDiffers(): void
+    {
+        $state = (new CurrentStatValue())
+            ->setType(StatValueType::ThermorScheduleState)
+            ->setValue(['isOffPeak' => true]);
+        $repository = $this->createMock(CurrentStatValueRepository::class);
+        $repository->expects($this->exactly(2))
+            ->method('findOneBy')
+            ->with(['type' => StatValueType::ThermorScheduleState])
+            ->willReturn($state);
+        $service = new ThermorScheduleService(
+            $repository,
+            $this->createMock(EntityManagerInterface::class),
+        );
+
+        self::assertFalse($service->hasOffPeakStateChanged(true));
+        self::assertTrue($service->hasOffPeakStateChanged(false));
+    }
+
+    public function testRemembersOffPeakStateInCurrentStatValue(): void
+    {
+        $repository = $this->createMock(CurrentStatValueRepository::class);
+        $repository->expects($this->once())
+            ->method('findOneBy')
+            ->with(['type' => StatValueType::ThermorScheduleState])
+            ->willReturn(null);
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects($this->once())
+            ->method('persist')
+            ->with($this->callback(static function (CurrentStatValue $value): bool {
+                return $value->getType() === StatValueType::ThermorScheduleState
+                    && $value->getValue() === ['isOffPeak' => false];
+            }));
+        $entityManager->expects($this->once())->method('flush');
+
+        $service = new ThermorScheduleService($repository, $entityManager);
+        $service->rememberOffPeakState(false);
+    }
+
     #[DataProvider('invalidSchedules')]
     public function testRejectsInvalidPeriods(array $periods): void
     {
