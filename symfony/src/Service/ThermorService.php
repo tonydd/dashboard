@@ -7,6 +7,7 @@ use App\Entity\WaterHeaterStat;
 use App\Repository\CurrentStatValueRepository;
 use App\Repository\WaterHeaterStatRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Contracts\Cache\CacheInterface;
@@ -23,6 +24,8 @@ final readonly class ThermorService
         private WaterHeaterStatRepository  $waterHeaterStatRepository,
         private Filesystem                 $filesystem,
         private HttpClientInterface        $httpClient,
+        private LoggerInterface            $logger,
+        private ThermorStateParser         $stateParser,
         private string                     $atlanticTokenUrl = '',
         private string                     $atlanticTokenAuthorization = '',
         private string                     $atlanticUsername = '',
@@ -32,17 +35,131 @@ final readonly class ThermorService
         private string                     $overkizAuthorization = '',
         private string                     $overkizEndpointUrl = '',
         private string                     $overkizEndpointCommandUrl = '',
+        private string                     $appTimezone = 'Europe/Paris',
     )
     {
     }
 
+    public function setAbsenceMode(bool $enabled): array
+    {
+        $result = $this->applyAbsenceMode($enabled, false);
+        unset($result['changed']);
 
-    public function command(): void
+        return $result;
+    }
+
+    public function reconcileAbsenceMode(bool $enabled): array
+    {
+        return $this->applyAbsenceMode($enabled, true);
+    }
+
+    private function applyAbsenceMode(bool $enabled, bool $skipIfAlreadyInRequestedState): array
     {
         $atlanticToken = $this->atlanticToken();
         $magellanToken = $this->magellanToken($atlanticToken);
         $cookieValue = $this->endUserAPILogin($magellanToken);
-        $this->execCommand($cookieValue);
+        $setup = $this->setup($cookieValue);
+
+        $heater = null;
+        foreach ($setup['devices'] ?? [] as $device) {
+            if (($device['controllableName'] ?? null) === 'modbuslink:AtlanticDomesticHotWaterProductionMBLComponent') {
+                $heater = $device;
+                break;
+            }
+        }
+
+        if ($heater === null || !isset($heater['deviceURL'])) {
+            throw new \RuntimeException('The Overkiz water heater was not found in the setup response.');
+        }
+        if (($heater['available'] ?? false) !== true) {
+            throw new \RuntimeException('The Overkiz water heater is unavailable.');
+        }
+
+        if ($skipIfAlreadyInRequestedState) {
+            $states = $heater['states'] ?? [];
+            if (!is_array($states)) {
+                throw new \RuntimeException('The Overkiz water-heater state list is invalid.');
+            }
+
+            $absenceMode = null;
+            foreach ($states as $state) {
+                if (!is_array($state)) {
+                    throw new \RuntimeException('The Overkiz water-heater state list is invalid.');
+                }
+
+                if (($state['name'] ?? null) === 'modbuslink:DHWAbsenceModeState'
+                    && is_string($state['value'] ?? null)
+                ) {
+                    $absenceMode = $state['value'];
+                    break;
+                }
+            }
+
+            if ($absenceMode === null) {
+                throw new \RuntimeException('The Overkiz setup did not report the water-heater absence mode.');
+            }
+
+            if (($absenceMode !== 'off') === $enabled) {
+                return [
+                    'enabled' => $enabled,
+                    'validUntil' => null,
+                    'changed' => false,
+                ];
+            }
+        }
+
+        $validUntil = null;
+        if ($enabled) {
+            $start = new \DateTimeImmutable('now', new \DateTimeZone($this->appTimezone));
+            $end = $start->modify('+1 year');
+            $startParameters = $this->dateParameters($start);
+
+            $commands = [
+                ['name' => 'setDateTime', 'parameters' => [$startParameters]],
+                ['name' => 'setAbsenceStartDate', 'parameters' => [$startParameters]],
+                ['name' => 'setAbsenceEndDate', 'parameters' => [$this->dateParameters($end)]],
+                ['name' => 'setAbsenceMode', 'parameters' => ['prog']],
+            ];
+            $validUntil = $end->format(\DateTimeInterface::ATOM);
+        } else {
+            $commands = [
+                ['name' => 'setAbsenceMode', 'parameters' => ['off']],
+            ];
+        }
+
+        $deviceCommands = $heater['definition']['commands'] ?? [];
+        if (!is_array($deviceCommands)) {
+            throw new \RuntimeException('The Overkiz water-heater command list is invalid.');
+        }
+        $availableCommands = array_column($deviceCommands, 'commandName');
+        foreach ($commands as $command) {
+            if (!in_array($command['name'], $availableCommands, true)) {
+                throw new \RuntimeException(sprintf('The Overkiz water heater does not support "%s".', $command['name']));
+            }
+        }
+
+        foreach ($commands as $command) {
+            $this->execCommand($cookieValue, $heater['deviceURL'], $command['name'], $command['parameters']);
+        }
+
+        return [
+            'enabled' => $enabled,
+            'validUntil' => $validUntil,
+            'changed' => true,
+        ];
+    }
+
+    private function dateParameters(\DateTimeImmutable $date): array
+    {
+        return [
+            'year' => (int) $date->format('Y'),
+            'month' => (int) $date->format('n'),
+            'day' => (int) $date->format('j'),
+            'hour' => (int) $date->format('G'),
+            'minute' => (int) $date->format('i'),
+            'second' => (int) $date->format('s'),
+            'weekday' => (int) $date->format('N'),
+        ];
     }
 
     public function update(): void
@@ -54,49 +171,11 @@ final readonly class ThermorService
 
         $this->filesystem->dumpFile('./var/files/thermorData.json', json_encode($setup, JSON_PRETTY_PRINT));
 
-        $out = [];
-        foreach (($setup['devices'] ?? []) as $device) {
-            if ($device['controllableName'] === 'modbuslink:AtlanticDomesticHotWaterProductionMBLComponent') {
-                $states = $device['states'];
+        $out = $this->stateParser->extract($setup);
+        if ($out === null) {
+            $this->logger->warning('Skipping Thermor history update because the Overkiz response is missing required water-heater states.');
 
-                // Trouver l'état 'core:HeatingStatusState'
-                $heatingStatusState = array_filter($states, function ($state) {
-                    return $state['name'] === 'core:HeatingStatusState';
-                });
-                $heatingStatusState = reset($heatingStatusState);
-                $out['heatingState'] = $heatingStatusState ? $heatingStatusState['value'] !== 'off' : null;
-
-                // Trouver l'état 'modbuslink:MiddleWaterTemperatureState'
-                $middleWaterTemperatureState = array_filter($states, function ($state) {
-                    return $state['name'] === 'modbuslink:MiddleWaterTemperatureState';
-                });
-                $middleWaterTemperatureState = reset($middleWaterTemperatureState);
-                $out['waterTemperature'] = $middleWaterTemperatureState ? $middleWaterTemperatureState['value'] : null;
-
-                // Trouver l'état 'core:RemainingHotWaterState'
-                $remainingHotWaterState = array_filter($states, function ($state) {
-                    return $state['name'] === 'core:RemainingHotWaterState';
-                });
-                $remainingHotWaterState = reset($remainingHotWaterState);
-                $out['V40Capacity'] = $remainingHotWaterState ? $remainingHotWaterState['value'] : null;
-
-                // Trouver l'état 'modbuslink:DHWAbsenceModeState'
-                $absenceModeState = array_filter($states, function ($state) {
-                    return $state['name'] === 'modbuslink:DHWAbsenceModeState';
-                });
-                $absenceModeState = reset($absenceModeState);
-                $out['absenceMode'] = $absenceModeState ? ($absenceModeState['value'] === 'off' ? 0 : 1) : null;
-
-            } elseif ($device['controllableName'] === 'modbuslink:DHWCumulatedElectricalEnergyConsumptionMBLSystemDeviceSensor') {
-                $states = $device['states'];
-
-                // Trouver l'état 'core:ElectricEnergyConsumptionState'
-                $electricEnergyConsumptionState = array_filter($states, function ($state) {
-                    return $state['name'] === 'core:ElectricEnergyConsumptionState';
-                });
-                $electricEnergyConsumptionState = reset($electricEnergyConsumptionState);
-                $out['electricalConsumption'] = $electricEnergyConsumptionState ? $electricEnergyConsumptionState['value'] : null;
-            }
+            return;
         }
 
         $waterHeaterStat = $this->waterHeaterStatRepository->findLast();
@@ -135,8 +214,12 @@ final readonly class ThermorService
 
     private function atlanticToken(): string
     {
-        return $this->cache->get('atlanticToken', function (ItemInterface $item): ?string {
+        return $this->cache->get('atlanticToken', function (ItemInterface $item): string {
             $ch = curl_init();
+            if ($ch === false) {
+                throw new \RuntimeException('Could not initialize the Atlantic authentication request.');
+            }
+
             curl_setopt($ch, CURLOPT_URL, $this->atlanticTokenUrl);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
@@ -154,44 +237,50 @@ final readonly class ThermorService
                 ])
             );
 
-            $response = curl_exec($ch);
-            curl_close($ch);
-
+            $response = $this->finishCurlRequest($ch, curl_exec($ch), 'Atlantic authentication');
             $data = json_decode($response, true);
-            if (isset($data['access_token'])) {
-                $item->expiresAfter($data['expires_in'] - 6); // 6 secondes de marge
-                return $data['access_token'];
-            } else {
-                $item->expiresAt(((new \DateTime())->modify('-1 day')));
-                return null;
+            if (!is_array($data) || !isset($data['access_token'], $data['expires_in'])) {
+                throw new \RuntimeException('Atlantic authentication response did not contain an access token.');
             }
+
+            $item->expiresAfter(max(1, (int) $data['expires_in'] - 6));
+            return $data['access_token'];
         });
     }
 
     private function magellanToken(string $atlanticToken): string
     {
-        return $this->cache->get('magellanToken', function (ItemInterface $item) use ($atlanticToken): ?string {
+        return $this->cache->get('magellanToken', function (ItemInterface $item) use ($atlanticToken): string {
             $ch = curl_init();
+            if ($ch === false) {
+                throw new \RuntimeException('Could not initialize the Magellan authentication request.');
+            }
+
             curl_setopt($ch, CURLOPT_URL, $this->magellanTokenUrl);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
                 'Authorization: Bearer ' . $atlanticToken,
             ]);
 
-            $response = curl_exec($ch);
-            curl_close($ch);
+            $response = $this->finishCurlRequest($ch, curl_exec($ch), 'Magellan authentication');
+            $jwt = trim($response, "\" \r\n");
+            if ($jwt === '') {
+                throw new \RuntimeException('Magellan authentication response did not contain a token.');
+            }
 
-            $jwt = str_replace('"', '', $response);
-            $item->expiresAfter(300); // 125 secondes
+            $item->expiresAfter(300);
             return $jwt;
         });
     }
 
     private function endUserAPILogin(string $magellanToken): string
     {
-        return $this->cache->get('overkizToken', function (ItemInterface $item) use ($magellanToken): ?string {
-
+        return $this->cache->get('overkizToken', function (ItemInterface $item) use ($magellanToken): string {
             $ch = curl_init();
+            if ($ch === false) {
+                throw new \RuntimeException('Could not initialize the Overkiz login request.');
+            }
+
             curl_setopt($ch, CURLOPT_URL, $this->overkizTokenUrl);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
@@ -205,23 +294,23 @@ final readonly class ThermorService
                     'jwt' => $magellanToken
                 ])
             );
-            $cookies = [];
-            curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($ch, $headerLine) use (&$cookies) {
-                if (preg_match('/^Set-Cookie:\s*([^;]*)/mi', $headerLine, $cookie) == 1)
-                    $cookies = $cookie;
+            $sessionCookie = null;
+            curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($ch, $headerLine) use (&$sessionCookie) {
+                if (preg_match('/^Set-Cookie:\s*JSESSIONID=([^;]*)/i', trim($headerLine), $cookie) === 1) {
+                    $sessionCookie = $cookie[1];
+                }
                 return strlen($headerLine); // Needed by curl
             });
 
-            $response = curl_exec($ch);
-            curl_close($ch);
+            $this->finishCurlRequest($ch, curl_exec($ch), 'Overkiz login');
+            if ($sessionCookie === null || $sessionCookie === '') {
+                throw new \RuntimeException('Overkiz login response did not contain a session cookie.');
+            }
+            $cookieValue = str_contains($sessionCookie, '~')
+                ? explode('~', $sessionCookie, 2)[1]
+                : $sessionCookie;
 
-            $cookieLine = $cookies[1];
-            $cookieExplode = explode('=', $cookieLine);
-            $cookieValue = $cookieExplode[1];
-            $cookieExplode = explode('~', $cookieValue);
-            $cookieValue = $cookieExplode[1];
-
-            $item->expiresAfter(60 * 15); // 15 minutes
+            $item->expiresAfter(60 * 15);
             return $cookieValue;
         });
     }
@@ -229,6 +318,10 @@ final readonly class ThermorService
     private function setup(string $cookieValue): array
     {
         $ch = curl_init();
+        if ($ch === false) {
+            throw new \RuntimeException('Could not initialize the Overkiz setup request.');
+        }
+
         curl_setopt($ch, CURLOPT_URL, $this->overkizEndpointUrl);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
@@ -238,16 +331,32 @@ final readonly class ThermorService
             'Cookie: JSESSIONID=' . $cookieValue,
         ]);
 
-        $response = curl_exec($ch);
-        curl_close($ch);
+        $response = $this->finishCurlRequest($ch, curl_exec($ch), 'Overkiz setup');
+        $data = json_decode($response, true);
+        if (!is_array($data)) {
+            throw new \RuntimeException('Overkiz setup returned invalid JSON.');
+        }
 
-        return json_decode($response, true);
+        return $data;
     }
 
-    private function execCommand(string $cookieValue): array
+    private function finishCurlRequest(\CurlHandle $ch, string|false $response, string $requestName): string
     {
-        $data = [];
+        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
 
+        if ($response === false) {
+            throw new \RuntimeException(sprintf('%s request failed: %s', $requestName, $error));
+        }
+        if ($status < 200 || $status >= 300) {
+            throw new \RuntimeException(sprintf('%s request failed with HTTP %d.', $requestName, $status));
+        }
+
+        return $response;
+    }
+
+    private function execCommand(string $cookieValue, string $deviceUrl, string $commandName, array $parameters): array
+    {
         $response = $this->httpClient->request('POST', $this->overkizEndpointCommandUrl, [
             'headers' => [
                 'Host' => 'ha110-1.overkiz.com',
@@ -257,12 +366,27 @@ final readonly class ThermorService
                 'Content-Type' => 'application/json',
                 'Accept' => 'application/json'
             ],
-            'json' => $data,
+            'json' => [
+                'label' => 'dashboard',
+                'actions' => [[
+                    'deviceURL' => $deviceUrl,
+                    'commands' => [[
+                        'name' => $commandName,
+                        'parameters' => $parameters,
+                    ]],
+                ]],
+            ],
         ]);
 
-        $responseData = $response->toArray(false);
-        //dd($responseData);
+        $status = $response->getStatusCode();
+        if ($status < 200 || $status >= 300) {
+            throw new \RuntimeException(sprintf('Overkiz command "%s" failed with HTTP %d.', $commandName, $status));
+        }
 
+        $responseData = $response->toArray(false);
+        if (!isset($responseData['execId'])) {
+            throw new \RuntimeException(sprintf('Overkiz did not acknowledge command "%s".', $commandName));
+        }
         return $responseData;
     }
 }

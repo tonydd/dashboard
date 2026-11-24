@@ -11,7 +11,8 @@ services:
     environment:
       - HOST=0.0.0.0
     depends_on:
-      - php
+      php:
+        condition: service_started
 
   php:
     build:
@@ -20,24 +21,36 @@ services:
     container_name: app_php
     volumes:
       - ./symfony:/var/www/html
-      - /home/anthony/Archives/Diapo:/home/anthony/Archives/Diapo:ro
+      - ${DIAPO_PATH:-./symfony/var/backgrounds}:${BACKGROUND_PATH:-/srv/backgrounds}:ro
     working_dir: /var/www/html/public
-    command: php -S 0.0.0.0:80 -t .
+    environment:
+      BACKGROUND_PATH: ${BACKGROUND_PATH:-/srv/backgrounds}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Paris}
+      THERMOR_API_TOKEN: ${THERMOR_API_TOKEN:-}
+    command: sh -c "cd /var/www/html && composer install --no-interaction --prefer-dist && php -S 0.0.0.0:80 -t public"
     ports:
       - "8000:80"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+
   db:
     image: mysql:8.0
+    container_name: app_db
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: dashboard
-      MYSQL_USER: user
-      MYSQL_PASSWORD: password
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-symfony}
+      MYSQL_USER: ${MYSQL_USER:-dashboard}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-dashboard}
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     ports:
-        - "33061:3306"
+      - "${MYSQL_PORT:-33061}:3306"
     volumes:
-        - database_data:/var/lib/mysql
+      - database_data:/var/lib/mysql
 
 volumes:
-    database_data:
+  database_data:

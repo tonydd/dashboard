@@ -18,6 +18,8 @@ parameters:
     overkizEndpointUrl: '%env(string:OVERKIZ_ENDPOINT_URL)%'
     overkizEndpointCommandUrl: '%env(string:OVERKIZ_ENDPOINT_COMMAND_URL)%'
     backgroundPath: '%env(string:BACKGROUND_PATH)%'
+    thermorApiToken: '%env(string:THERMOR_API_TOKEN)%'
+    appTimezone: '%env(string:APP_TIMEZONE)%'
 
 services:
     # default configuration for services in *this* file
@@ -39,6 +41,8 @@ services:
             $overkizEndpointUrl: '%overkizEndpointUrl%'
             $overkizEndpointCommandUrl: '%overkizEndpointCommandUrl%'
             $backgroundPath: '%backgroundPath%'
+            $thermorApiToken: '%thermorApiToken%'
+            $appTimezone: '%appTimezone%'
 
     # Automatically injects dependencies in your services.
     # Inject parameters as env variables

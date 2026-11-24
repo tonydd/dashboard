@@ -138,7 +138,6 @@ final readonly class SolarService
             ]);
 
             $response = curl_exec($ch);
-            curl_close($ch);
 
             $data = json_decode($response, true);
             if (isset($data['result']['access_token'])) {
@@ -154,7 +153,6 @@ final readonly class SolarService
             }
         });
 
-        dump($cachedValue);
         return $cachedValue;
     }
 
@@ -184,7 +182,6 @@ final readonly class SolarService
         ]);
 
         $response = curl_exec($ch);
-        curl_close($ch);
 
         $data = json_decode($response, true);
         if (isset($data['result'])) {
