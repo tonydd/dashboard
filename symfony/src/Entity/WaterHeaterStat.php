@@ -2,7 +2,7 @@
 
 namespace App\Entity;
 
-use App\Enum\StatValueType;
+use App\Enum\KeyValueKey;
 use App\Repository\WaterHeaterStatRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
@@ -107,8 +107,8 @@ class WaterHeaterStat
         return $this;
     }
 
-    public static function currentValueType(): StatValueType
+    public static function currentValueKey(): KeyValueKey
     {
-        return StatValueType::Thermor;
+        return KeyValueKey::Thermor;
     }
 }

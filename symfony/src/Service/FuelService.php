@@ -2,10 +2,9 @@
 
 namespace App\Service;
 
-use App\Entity\CurrentStatValue;
 use App\Entity\FuelStat;
 use App\Enum\FuelType;
-use App\Repository\CurrentStatValueRepository;
+use App\Repository\KeyValueRepository;
 use App\Repository\FuelStatRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Serializer\SerializerInterface;
@@ -14,7 +13,7 @@ final readonly class FuelService
 {
     public function __construct(
         private EntityManagerInterface $entityManager,
-        private CurrentStatValueRepository $currentStatValueRepository,
+        private KeyValueRepository $keyValueRepository,
         private SerializerInterface $serializer,
         private FuelStatRepository $fuelStatRepository
     ) {
@@ -57,17 +56,9 @@ final readonly class FuelService
         }
         $this->entityManager->flush();
 
-        $currentStatValue = $this->currentStatValueRepository->findOneBy(['type' => FuelStat::currentValueType()]);
-
-        if ($currentStatValue) {
-            $currentStatValue->setValue($this->serializer->normalize($fuels));
-        } else {
-            $currentStatValue = new CurrentStatValue();
-            $currentStatValue->setType(FuelStat::currentValueType());
-            $currentStatValue->setValue($this->serializer->normalize($fuels));
-            $this->entityManager->persist($currentStatValue);
-        }
-
-        $this->entityManager->flush();
+        $this->keyValueRepository->setValue(
+            FuelStat::currentValueKey(),
+            $this->serializer->normalize($fuels),
+        );
     }
 }

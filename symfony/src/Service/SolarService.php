@@ -2,9 +2,8 @@
 
 namespace App\Service;
 
-use App\Entity\CurrentStatValue;
 use App\Entity\SolarStat;
-use App\Repository\CurrentStatValueRepository;
+use App\Repository\KeyValueRepository;
 use App\Repository\SolarStatRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -19,7 +18,7 @@ final readonly class SolarService
         private LoggerInterface $logger,
         private EntityManagerInterface $entityManager,
         private CacheInterface $cache,
-        private CurrentStatValueRepository $currentStatValueRepository,
+        private KeyValueRepository $keyValueRepository,
         private SerializerInterface $serializer,
         private SolarStatRepository $solarStatRepository,
         private Filesystem $filesystem,
@@ -71,16 +70,10 @@ final readonly class SolarService
                 }
                 $this->entityManager->flush();
 
-                $currentStatValue = $this->currentStatValueRepository->findOneBy(['type' => SolarStat::currentValueType()]);
-                if ($currentStatValue) {
-                    $currentStatValue->setValue($this->serializer->normalize($solarStat));
-                } else {
-                    $currentStatValue = new CurrentStatValue();
-                    $currentStatValue->setType(SolarStat::currentValueType());
-                    $currentStatValue->setValue($this->serializer->normalize($solarStat));
-                    $this->entityManager->persist($currentStatValue);
-                }
-                $this->entityManager->flush();
+                $this->keyValueRepository->setValue(
+                    SolarStat::currentValueKey(),
+                    $this->serializer->normalize($solarStat),
+                );
 
             } else {
                 $this->logger->error('Cannot retrieve device data');

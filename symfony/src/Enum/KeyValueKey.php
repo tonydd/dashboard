@@ -2,7 +2,7 @@
 
 namespace App\Enum;
 
-enum StatValueType: string
+enum KeyValueKey: string
 {
     case Fuel = 'fuel';
     case Solar = 'solar';

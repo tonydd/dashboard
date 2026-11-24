@@ -2,9 +2,8 @@
 
 namespace App\Service;
 
-use App\Entity\CurrentStatValue;
 use App\Entity\WaterHeaterStat;
-use App\Repository\CurrentStatValueRepository;
+use App\Repository\KeyValueRepository;
 use App\Repository\WaterHeaterStatRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -19,7 +18,7 @@ final readonly class ThermorService
     public function __construct(
         private EntityManagerInterface     $entityManager,
         private CacheInterface             $cache,
-        private CurrentStatValueRepository $currentStatValueRepository,
+        private KeyValueRepository $keyValueRepository,
         private SerializerInterface        $serializer,
         private WaterHeaterStatRepository  $waterHeaterStatRepository,
         private Filesystem                 $filesystem,
@@ -200,16 +199,10 @@ final readonly class ThermorService
 
         $this->entityManager->flush();
 
-        $currentStatValue = $this->currentStatValueRepository->findOneBy(['type' => WaterHeaterStat::currentValueType()]);
-        if ($currentStatValue) {
-            $currentStatValue->setValue($this->serializer->normalize($waterHeaterStat));
-        } else {
-            $currentStatValue = new CurrentStatValue();
-            $currentStatValue->setType(WaterHeaterStat::currentValueType());
-            $currentStatValue->setValue($this->serializer->normalize($waterHeaterStat));
-            $this->entityManager->persist($currentStatValue);
-        }
-        $this->entityManager->flush();
+        $this->keyValueRepository->setValue(
+            WaterHeaterStat::currentValueKey(),
+            $this->serializer->normalize($waterHeaterStat),
+        );
     }
 
     private function atlanticToken(): string

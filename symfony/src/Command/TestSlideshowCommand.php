@@ -1,7 +1,8 @@
 <?php
 namespace App\Command;
 
-use Doctrine\DBAL\Connection;
+use App\Enum\KeyValueKey;
+use App\Repository\KeyValueRepository;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -14,7 +15,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 class TestSlideshowCommand extends Command
 {
     public function __construct(
-        private readonly Connection       $connection,
+        private readonly KeyValueRepository $keyValueRepository,
         private readonly string $backgroundPath
     )
     {
@@ -26,8 +27,8 @@ class TestSlideshowCommand extends Command
         $output->writeln("Vérification du slideshow...");
         $output->writeln("Chemin des fonds d'écran : <info>{$this->backgroundPath}</info>");
 
-        $statValue = $this->connection->fetchOne("SELECT value FROM current_stat_value WHERE type = 'day_image'");
-        $output->writeln("Valeur actuelle du slideshow : <info>$statValue</info>");
+        $storedValue = $this->keyValueRepository->getValue(KeyValueKey::Background);
+        $output->writeln('Valeur actuelle du slideshow : <info>' . json_encode($storedValue, JSON_THROW_ON_ERROR) . '</info>');
 
         $backgrounds = [];
         foreach (scandir($this->backgroundPath) as $file) {

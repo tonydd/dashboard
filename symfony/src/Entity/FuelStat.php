@@ -2,7 +2,7 @@
 
 namespace App\Entity;
 
-use App\Enum\StatValueType;
+use App\Enum\KeyValueKey;
 use App\Repository\FuelStatRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
@@ -65,8 +65,8 @@ class FuelStat
         return $this;
     }
 
-    public static function currentValueType(): StatValueType
+    public static function currentValueKey(): KeyValueKey
     {
-        return StatValueType::Fuel;
+        return KeyValueKey::Fuel;
     }
 }

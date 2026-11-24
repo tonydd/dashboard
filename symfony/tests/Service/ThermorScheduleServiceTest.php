@@ -2,11 +2,9 @@
 
 namespace App\Tests\Service;
 
-use App\Entity\CurrentStatValue;
-use App\Enum\StatValueType;
-use App\Repository\CurrentStatValueRepository;
+use App\Enum\KeyValueKey;
+use App\Repository\KeyValueRepository;
 use App\Service\ThermorScheduleService;
-use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -14,20 +12,19 @@ final class ThermorScheduleServiceTest extends TestCase
 {
     public function testPersistsDefaultScheduleWhenNoneExists(): void
     {
-        $repository = $this->createMock(CurrentStatValueRepository::class);
-        $repository->method('findOneBy')->willReturn(null);
-
-        $entityManager = $this->createMock(EntityManagerInterface::class);
-        $entityManager->expects($this->once())
-            ->method('persist')
-            ->with($this->callback(static function (CurrentStatValue $value): bool {
-                return $value->getType() === StatValueType::ThermorSchedule
-                    && $value->getValue()['days']['monday'] === [['start' => '00:00', 'end' => '08:00']]
-                    && count($value->getValue()['days']) === 7;
+        $repository = $this->createMock(KeyValueRepository::class);
+        $repository->expects($this->once())
+            ->method('getValue')
+            ->with(KeyValueKey::ThermorSchedule)
+            ->willReturn(null);
+        $repository->expects($this->once())
+            ->method('setValue')
+            ->with(KeyValueKey::ThermorSchedule, $this->callback(static function (array $schedule): bool {
+                return $schedule['days']['monday'] === [['start' => '00:00', 'end' => '08:00']]
+                    && count($schedule['days']) === 7;
             }));
-        $entityManager->expects($this->once())->method('flush');
 
-        $scheduleService = new ThermorScheduleService($repository, $entityManager);
+        $scheduleService = new ThermorScheduleService($repository);
         $schedule = $scheduleService->getSchedule();
 
         self::assertSame([['start' => '00:00', 'end' => '08:00']], $schedule['days']['sunday']);
@@ -54,41 +51,25 @@ final class ThermorScheduleServiceTest extends TestCase
 
     public function testOffPeakStateChangesOnlyWhenStoredConditionDiffers(): void
     {
-        $state = (new CurrentStatValue())
-            ->setType(StatValueType::ThermorScheduleState)
-            ->setValue(['isOffPeak' => true]);
-        $repository = $this->createMock(CurrentStatValueRepository::class);
+        $repository = $this->createMock(KeyValueRepository::class);
         $repository->expects($this->exactly(2))
-            ->method('findOneBy')
-            ->with(['type' => StatValueType::ThermorScheduleState])
-            ->willReturn($state);
-        $service = new ThermorScheduleService(
-            $repository,
-            $this->createMock(EntityManagerInterface::class),
-        );
+            ->method('getValue')
+            ->with(KeyValueKey::ThermorScheduleState)
+            ->willReturn(['isOffPeak' => true]);
+        $service = new ThermorScheduleService($repository);
 
         self::assertFalse($service->hasOffPeakStateChanged(true));
         self::assertTrue($service->hasOffPeakStateChanged(false));
     }
 
-    public function testRemembersOffPeakStateInCurrentStatValue(): void
+    public function testRemembersOffPeakStateInKeyValue(): void
     {
-        $repository = $this->createMock(CurrentStatValueRepository::class);
+        $repository = $this->createMock(KeyValueRepository::class);
         $repository->expects($this->once())
-            ->method('findOneBy')
-            ->with(['type' => StatValueType::ThermorScheduleState])
-            ->willReturn(null);
+            ->method('setValue')
+            ->with(KeyValueKey::ThermorScheduleState, ['isOffPeak' => false]);
 
-        $entityManager = $this->createMock(EntityManagerInterface::class);
-        $entityManager->expects($this->once())
-            ->method('persist')
-            ->with($this->callback(static function (CurrentStatValue $value): bool {
-                return $value->getType() === StatValueType::ThermorScheduleState
-                    && $value->getValue() === ['isOffPeak' => false];
-            }));
-        $entityManager->expects($this->once())->method('flush');
-
-        $service = new ThermorScheduleService($repository, $entityManager);
+        $service = new ThermorScheduleService($repository);
         $service->rememberOffPeakState(false);
     }
 
@@ -118,15 +99,9 @@ final class ThermorScheduleServiceTest extends TestCase
 
     private function serviceWithSchedule(array $schedule): ThermorScheduleService
     {
-        $value = (new CurrentStatValue())
-            ->setType(StatValueType::ThermorSchedule)
-            ->setValue($schedule);
-        $repository = $this->createMock(CurrentStatValueRepository::class);
-        $repository->method('findOneBy')->willReturn($value);
+        $repository = $this->createMock(KeyValueRepository::class);
+        $repository->method('getValue')->willReturn($schedule);
 
-        return new ThermorScheduleService(
-            $repository,
-            $this->createMock(EntityManagerInterface::class),
-        );
+        return new ThermorScheduleService($repository);
     }
 }

@@ -2,8 +2,8 @@
 
 namespace App\Controller;
 
-use App\Enum\StatValueType;
-use App\Repository\CurrentStatValueRepository;
+use App\Enum\KeyValueKey;
+use App\Repository\KeyValueRepository;
 use App\Service\ThermorService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -23,10 +23,9 @@ class ThermorController extends AbstractController
     }
 
     #[Route('', methods: ['GET'])]
-    public function __invoke(CurrentStatValueRepository $currentStatValueRepository): JsonResponse
+    public function __invoke(KeyValueRepository $keyValueRepository): JsonResponse
     {
-        $currentStatValue = $currentStatValueRepository->findOneBy(['type' => StatValueType::Thermor]);
-        return $this->json($currentStatValue?->getValue() ?? []);
+        return $this->json($keyValueRepository->getValue(KeyValueKey::Thermor) ?? []);
     }
 
     #[Route('/absence-mode', methods: ['POST'])]

@@ -2,8 +2,8 @@
 
 namespace App\Controller;
 
-use App\Enum\StatValueType;
-use App\Repository\CurrentStatValueRepository;
+use App\Enum\KeyValueKey;
+use App\Repository\KeyValueRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
@@ -11,9 +11,8 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/api/solar')]
 class SolarController extends AbstractController
 {
-    public function __invoke(CurrentStatValueRepository $currentStatValueRepository): JsonResponse
+    public function __invoke(KeyValueRepository $keyValueRepository): JsonResponse
     {
-        $currentStatValue = $currentStatValueRepository->findOneBy(['type' => StatValueType::Solar]);
-        return $this->json($currentStatValue->getValue() ?? []);
+        return $this->json($keyValueRepository->getValue(KeyValueKey::Solar) ?? []);
     }
 }

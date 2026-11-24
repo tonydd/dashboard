@@ -2,18 +2,15 @@
 
 namespace App\Service;
 
-use App\Entity\CurrentStatValue;
-use App\Enum\StatValueType;
-use App\Repository\CurrentStatValueRepository;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Enum\KeyValueKey;
+use App\Repository\KeyValueRepository;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 final readonly class WaterQualityService
 {
     public function __construct(
-        private EntityManagerInterface $entityManager,
         private HttpClientInterface $httpClient,
-        private CurrentStatValueRepository $currentStatValueRepository,
+        private KeyValueRepository $keyValueRepository,
     ) {
     }
 
@@ -25,16 +22,7 @@ final readonly class WaterQualityService
         $content = $response->toArray();
 
         $waterQuality = $this->evaluateWaterQuality($content);
-        $currentStatValue = $this->currentStatValueRepository->findOneBy(['type' => StatValueType::WaterQuality]);
-        if ($currentStatValue) {
-            $currentStatValue->setValue($waterQuality);
-        } else {
-            $currentStatValue = new CurrentStatValue();
-            $currentStatValue->setType(StatValueType::WaterQuality);
-            $currentStatValue->setValue($waterQuality);
-            $this->entityManager->persist($currentStatValue);
-        }
-        $this->entityManager->flush();
+        $this->keyValueRepository->setValue(KeyValueKey::WaterQuality, $waterQuality);
     }
 
     private function evaluateWaterQuality($data) {

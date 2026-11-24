@@ -2,10 +2,8 @@
 
 namespace App\Service;
 
-use App\Entity\CurrentStatValue;
-use App\Enum\StatValueType;
-use App\Repository\CurrentStatValueRepository;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Enum\KeyValueKey;
+use App\Repository\KeyValueRepository;
 
 final readonly class ThermorScheduleService
 {
@@ -20,8 +18,7 @@ final readonly class ThermorScheduleService
     ];
 
     public function __construct(
-        private CurrentStatValueRepository $currentStatValueRepository,
-        private EntityManagerInterface $entityManager,
+        private KeyValueRepository $keyValueRepository,
         private string $appTimezone = 'Europe/Paris',
     ) {
     }
@@ -47,15 +44,11 @@ final readonly class ThermorScheduleService
 
     public function hasOffPeakStateChanged(bool $isOffPeak): bool
     {
-        $currentStatValue = $this->currentStatValueRepository->findOneBy([
-            'type' => StatValueType::ThermorScheduleState,
-        ]);
-
-        if ($currentStatValue === null) {
+        $value = $this->keyValueRepository->getValue(KeyValueKey::ThermorScheduleState);
+        if ($value === null) {
             return true;
         }
 
-        $value = $currentStatValue->getValue();
         if (!is_array($value)
             || array_keys($value) !== ['isOffPeak']
             || !is_bool($value['isOffPeak'])
@@ -68,40 +61,19 @@ final readonly class ThermorScheduleService
 
     public function rememberOffPeakState(bool $isOffPeak): void
     {
-        $currentStatValue = $this->currentStatValueRepository->findOneBy([
-            'type' => StatValueType::ThermorScheduleState,
-        ]);
-
-        if ($currentStatValue === null) {
-            $currentStatValue = (new CurrentStatValue())
-                ->setType(StatValueType::ThermorScheduleState)
-                ->setValue(['isOffPeak' => $isOffPeak]);
-            $this->entityManager->persist($currentStatValue);
-        } else {
-            $currentStatValue->setValue(['isOffPeak' => $isOffPeak]);
-        }
-
-        $this->entityManager->flush();
+        $this->keyValueRepository->setValue(KeyValueKey::ThermorScheduleState, ['isOffPeak' => $isOffPeak]);
     }
 
     public function getSchedule(): array
     {
-        $currentStatValue = $this->currentStatValueRepository->findOneBy([
-            'type' => StatValueType::ThermorSchedule,
-        ]);
-
-        if ($currentStatValue === null) {
+        $schedule = $this->keyValueRepository->getValue(KeyValueKey::ThermorSchedule);
+        if ($schedule === null) {
             $schedule = $this->defaultSchedule();
-            $currentStatValue = (new CurrentStatValue())
-                ->setType(StatValueType::ThermorSchedule)
-                ->setValue($schedule);
-            $this->entityManager->persist($currentStatValue);
-            $this->entityManager->flush();
+            $this->keyValueRepository->setValue(KeyValueKey::ThermorSchedule, $schedule);
 
             return $schedule;
         }
 
-        $schedule = $currentStatValue->getValue();
         if (!is_array($schedule)) {
             throw new \InvalidArgumentException('The stored Thermor schedule must be a JSON object.');
         }

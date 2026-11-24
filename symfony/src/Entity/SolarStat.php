@@ -2,7 +2,7 @@
 
 namespace App\Entity;
 
-use App\Enum\StatValueType;
+use App\Enum\KeyValueKey;
 use App\Repository\SolarStatRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
@@ -50,8 +50,8 @@ class SolarStat
         return $this;
     }
 
-    public static function currentValueType(): StatValueType
+    public static function currentValueKey(): KeyValueKey
     {
-        return StatValueType::Solar;
+        return KeyValueKey::Solar;
     }
 }

@@ -2,43 +2,34 @@
 
 namespace App\Controller;
 
-use App\Entity\CurrentStatValue;
-use App\Enum\StatValueType;
-use App\Repository\CurrentStatValueRepository;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Enum\KeyValueKey;
+use App\Repository\KeyValueRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
 
 #[Route('/api/background')]
 class BackgroundController extends AbstractController
 {
     public function __invoke(
-        CurrentStatValueRepository $currentStatValueRepository,
-        NormalizerInterface $normalizer,
-        EntityManagerInterface $entityManager,
+        KeyValueRepository $keyValueRepository,
         string $backgroundPath
     ): BinaryFileResponse {
-        $currentStatValue = $currentStatValueRepository->findOneBy(['type' => StatValueType::Background]);
-
-        if (!$currentStatValue) {
-            $currentStatValue = new CurrentStatValue();
-            $currentStatValue->setType(StatValueType::Background);
-            $currentStatValue->setValue($normalizer->normalize(['currentDay' => (new \DateTimeImmutable())->format('Y-m-d'), 'background' => $this->getRandomBackground($backgroundPath)]));
-            $entityManager->persist($currentStatValue);
-            $entityManager->flush();
-        }
-
         $today = new \DateTimeImmutable();
-        $currentValue = $currentStatValue->getValue();
-        if (!$currentValue || $currentValue['currentDay'] !== $today->format('Y-m-d')) {
-            $currentStatValue->setValue($normalizer->normalize(['currentDay' => $today->format('Y-m-d'), 'background' => $this->getRandomBackground($backgroundPath)]));
-            $entityManager->flush();
+        $currentValue = $keyValueRepository->getValue(KeyValueKey::Background);
+        if (!is_array($currentValue)
+            || ($currentValue['currentDay'] ?? null) !== $today->format('Y-m-d')
+            || !is_string($currentValue['background'] ?? null)
+        ) {
+            $currentValue = [
+                'currentDay' => $today->format('Y-m-d'),
+                'background' => $this->getRandomBackground($backgroundPath),
+            ];
+            $keyValueRepository->setValue(KeyValueKey::Background, $currentValue);
         }
 
-        return $this->file(sprintf('%s/%s', $backgroundPath, $currentStatValue->getValue()['background']), 'image.jpg', ResponseHeaderBag::DISPOSITION_INLINE);
+        return $this->file(sprintf('%s/%s', $backgroundPath, $currentValue['background']), 'image.jpg', ResponseHeaderBag::DISPOSITION_INLINE);
     }
 
     private function getRandomBackground(string $backgroundPath): string
