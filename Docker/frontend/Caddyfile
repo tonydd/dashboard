@@ -1,0 +1,18 @@
+{
+	auto_https off
+}
+
+:80 {
+	encode zstd gzip
+
+	@api path /api /api/*
+	handle @api {
+		reverse_proxy php:80
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

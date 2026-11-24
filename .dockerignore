@@ -1,0 +1,15 @@
+.git
+.gitignore
+node_modules
+**/node_modules
+dist
+**/dist
+symfony/vendor
+symfony/var/cache
+symfony/var/log
+symfony/var/backgrounds
+.env*
+**/.env*
+!Docker/frontend/build-env/
+!Docker/frontend/build-env/.env
+!Docker/frontend/build-env/.env.production

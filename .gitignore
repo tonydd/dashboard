@@ -19,6 +19,12 @@ coverage
 .env.local
 .env.production
 .env.phone
+.env.compose.prod
+.env.frontend.prod
+.env.vue
+.env.production.vue
+.env.phone.vue
+Docker/frontend/build-env/
 
 /cypress/videos/
 /cypress/screenshots/

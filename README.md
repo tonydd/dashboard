@@ -5,7 +5,7 @@ Dashboard domestique composé d’une interface Vue 3/Vite et d’une API Symfon
 ## Etat local
 
 - Le frontend est prévu pour Node.js 20/Vite sur le port `5174`.
-- Le backend est prévu pour PHP 8.2+/Symfony sur le port `8000`.
+- Le backend requiert PHP 8.4+/Symfony 7.4 sur le port `8000`.
 - Docker Compose fournit aussi MySQL 8 sur le port hôte `33061`.
 - Les dépendances frontend et Symfony sont déjà présentes dans ce clone, mais les runtimes Docker/Node/PHP ne sont pas disponibles dans l’environnement actuel, donc aucun démarrage vérifié n’a pu être exécuté ici.
 
@@ -27,6 +27,7 @@ Avant le premier démarrage, créer `symfony/.env.local` avec l’URL MySQL Dock
 ## Documentation
 
 - [Installation locale, Docker et base de données](docs/LOCAL_SETUP.md)
+- [Déploiement Docker en production](docs/PRODUCTION_DEPLOYMENT.md)
 
 ## Commandes utiles
 

@@ -1,0 +1,82 @@
+services:
+  database:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env.compose.prod}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?Set MYSQL_DATABASE in .env.compose.prod}
+      MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in .env.compose.prod}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env.compose.prod}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    volumes:
+      - database_data:/var/lib/mysql
+
+  php:
+    build:
+      context: .
+      dockerfile: Docker/php/Dockerfile.prod
+    restart: unless-stopped
+    init: true
+    ports:
+      - "127.0.0.1:${PHP_BIND_PORT:-9100}:80"
+    env_file:
+      - ${SYMFONY_ENV_FILE:?Set SYMFONY_ENV_FILE to the decrypted Symfony env file}
+    environment: &app_environment
+      APP_ENV: prod
+      APP_DEBUG: "0"
+      APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Paris}
+      DATABASE_URL: "mysql://${MYSQL_USER:?}:${MYSQL_PASSWORD:?}@database:3306/${MYSQL_DATABASE:?}?serverVersion=8.0.39&charset=utf8mb4"
+      BACKGROUND_PATH: /srv/backgrounds
+    volumes:
+      - ${DIAPO_PATH:?Set DIAPO_PATH in .env.compose.prod}:/srv/backgrounds:ro
+    depends_on:
+      database:
+        condition: service_healthy
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Docker/php/Dockerfile.prod
+    restart: unless-stopped
+    init: true
+    user: www-data
+    working_dir: /var/www/html
+    env_file:
+      - ${SYMFONY_ENV_FILE:?Set SYMFONY_ENV_FILE to the decrypted Symfony env file}
+    command:
+      [
+        "php",
+        "bin/console",
+        "messenger:consume",
+        "scheduler_default",
+        "--time-limit=3600",
+        "--memory-limit=128M",
+      ]
+    environment: *app_environment
+    volumes:
+      - ${DIAPO_PATH:?Set DIAPO_PATH in .env.compose.prod}:/srv/backgrounds:ro
+    depends_on:
+      database:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: Docker/frontend/Dockerfile.prod
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${WEB_BIND_PORT:-9101}:80"
+    depends_on:
+      - php
+
+volumes:
+  database_data:

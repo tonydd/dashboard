@@ -1,0 +1,57 @@
+FROM php:8.4-apache-bookworm AS php-base
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libcurl4-openssl-dev \
+        libfreetype6-dev \
+        libicu-dev \
+        libjpeg62-turbo-dev \
+        libonig-dev \
+        libpng-dev \
+        libxml2-dev \
+        libzip-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j"$(nproc)" \
+        curl \
+        gd \
+        intl \
+        mbstring \
+        opcache \
+        pdo_mysql \
+        xml \
+        zip \
+    && rm -rf /var/lib/apt/lists/*
+
+FROM php-base AS app-build
+
+COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
+WORKDIR /var/www/html
+
+COPY symfony/composer.json symfony/composer.lock ./
+RUN composer install \
+    --no-dev \
+    --no-interaction \
+    --no-progress \
+    --prefer-dist \
+    --no-scripts \
+    --no-autoloader
+
+COPY symfony/ ./
+RUN composer dump-autoload --no-dev --classmap-authoritative --no-scripts
+
+FROM php-base AS app
+
+ENV APP_ENV=prod \
+    APP_DEBUG=0
+
+COPY Docker/php/apache-prod.conf /etc/apache2/sites-available/dashboard.conf
+COPY Docker/php/opcache-prod.ini /usr/local/etc/php/conf.d/opcache-prod.ini
+RUN a2dissite 000-default && a2ensite dashboard && a2enmod headers rewrite
+
+WORKDIR /var/www/html
+COPY --from=app-build --chown=www-data:www-data /var/www/html /var/www/html
+RUN mkdir -p var/cache var/log \
+    && touch .env \
+    && chown -R www-data:www-data var
+
+EXPOSE 80
+CMD ["apache2-foreground"]

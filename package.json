@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host --port 5174",
-    "build": "VITE_BASE_URL=/ vite build -- --sourcemap",
+    "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -1,0 +1,16 @@
+FROM node:22-alpine AS frontend-build
+
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY index.html vite.config.js ./
+COPY src ./src
+COPY public ./public
+COPY Docker/frontend/build-env/.env ./.env
+COPY Docker/frontend/build-env/.env.production ./.env.production
+RUN npm run build
+
+FROM caddy:2-alpine
+COPY Docker/frontend/Caddyfile /etc/caddy/Caddyfile
+COPY --from=frontend-build /app/dist /srv

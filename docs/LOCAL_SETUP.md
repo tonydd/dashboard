@@ -3,7 +3,7 @@
 ## Architecture
 
 - `src/` : application Vue 3/Vite servie sur `http://localhost:5174`.
-- `symfony/` : API Symfony 7.1/PHP servie sur `http://localhost:8000`.
+- `symfony/` : API Symfony 7.4/PHP servie sur `http://localhost:8000`.
 - `db` : MySQL 8.0, publié sur `localhost:33061`.
 - Docker Compose orchestre les trois services.
 
@@ -12,7 +12,7 @@
 Docker Engine avec la commande `docker compose` est recommandé. Pour un lancement sans Docker :
 
 - Node.js 20+
-- PHP 8.2+
+- PHP 8.4+
 - Composer 2
 - MySQL 8
 
