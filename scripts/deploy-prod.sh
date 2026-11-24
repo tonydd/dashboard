@@ -56,6 +56,7 @@ export SYMFONY_ENV_FILE="${SECRETS_DIR}/.env"
 
 echo "=== Clone du dépôt ==="
 git clone --depth 1 "$REPO" "$CLONE_DIR"
+mkdir -p "${CLONE_DIR}/symfony/var/backgrounds"
 
 echo "=== Préparation des paramètres frontend publics ==="
 mkdir -p "${CLONE_DIR}/Docker/frontend/build-env"
