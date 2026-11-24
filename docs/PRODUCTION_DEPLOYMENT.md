@@ -31,6 +31,8 @@ ProxyPassReverse / http://127.0.0.1:9100/
 
 Garder les directives SSL et les certificats existants. Si le VirtualHost frontend conserve une règle dédiée pour `/api/random-image/`, la placer avant les règles génériques et la faire pointer vers le port frontend choisi. Tester les deux VirtualHosts et recharger Apache avant de basculer le trafic. Choisir deux ports loopback libres dans `.env.compose.prod`.
 
+Comme le navigateur passe par le VirtualHost frontend, les variables frontend `VITE_API_BASE_URL`, `VITE_FUEL_API_URL`, `VITE_SOLAR_API_URL`, `VITE_WATER_HEATER_API_URL` et `VITE_WATER_QUALITY_API_URL` doivent utiliser les chemins relatifs `/api/...`. Un nom d'hôte API distinct crée des appels cross-origin et exige un certificat TLS valide pour ce nom ainsi qu'une configuration CORS correspondante. `VITE_BACKGROUND_URL` doit être `/api/background`; sans images `.jpg`, cette route répond `404`.
+
 ## Configuration et secrets
 
 Le script de déploiement s'attend à trouver dans l'archive GPG, extraite sous `/dev/shm` :
@@ -67,7 +69,19 @@ Prévoir des sauvegardes régulières du volume de production. Les migrations so
 
 ## Déploiement et exploitation
 
-Remplacer l'ancien script de déploiement par `scripts/deploy-prod.sh`. Il clone le dépôt, déchiffre les secrets en RAM, construit et démarre les services, importe le dump uniquement au premier démarrage, applique les migrations, puis arrête l'ancien worker Supervisor. Pour les déploiements suivants, l'archive peut omettre `database.sql.gz`.
+Remplacer l'ancien script de déploiement par `scripts/deploy-prod.sh`. Il clone le dépôt, déchiffre les secrets en RAM, construit et démarre les services, importe le dump uniquement au premier démarrage et applique les migrations. Le service Docker `scheduler` remplace l'ancien worker Supervisor. Pour les déploiements suivants, l'archive peut omettre `database.sql.gz`.
+
+Après avoir vérifié que le worker Docker `dashboard-prod-scheduler-1` fonctionne, désactiver l'ancien worker Supervisor. Si aucun autre programme n'est géré par Supervisor :
+
+```sh
+sudo supervisorctl stop symfony_scheduler
+sudo mv /etc/supervisor/conf.d/symfony_scheduler.conf /etc/supervisor/symfony_scheduler.conf.disabled
+sudo supervisorctl reread
+sudo supervisorctl update
+sudo systemctl disable --now supervisor
+```
+
+Le script de déploiement n'interagit plus avec Supervisor et ne demande donc plus son mot de passe sudo.
 
 Les commandes Compose utilisent le nom de projet fixe `dashboard-prod` afin de conserver le même volume MySQL entre les déploiements :
 

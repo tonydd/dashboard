@@ -131,7 +131,7 @@ Les tâches planifiées de l'application partagent le transport Symfony Schedule
 docker compose exec -T php sh -c 'cd /var/www/html && php bin/console messenger:consume scheduler_default --time-limit=3600'
 ```
 
-En production, si le consommateur est géré par Supervisor, redémarrez-le après chaque déploiement ou `cache:clear`. Le cache applicatif et le cache Doctrine sont stockés dans `var/cache`; les deux doivent être accessibles en écriture par l'utilisateur du worker. Si le déploiement et le worker utilisent des utilisateurs différents, configurez un groupe ou des ACL communs. Sinon, le worker peut continuer à tourner avec un chemin de cache supprimé ou ne pas pouvoir enregistrer les jetons API et les résultats Doctrine.
+En production Docker, le service `scheduler` maintient le consommateur et redémarre automatiquement. Le cache applicatif et le cache Doctrine sont stockés dans `var/cache` et doivent être accessibles en écriture par `www-data`, l'utilisateur du worker et des commandes Symfony du script de déploiement.
 
 Pour un lancement sans Docker, depuis `symfony/`, utilisez de même :
 

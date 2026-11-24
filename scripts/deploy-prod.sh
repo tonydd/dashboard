@@ -9,14 +9,8 @@ SECRETS_DIR="$(mktemp -d /dev/shm/dashboard-secrets-XXXXXX)"
 COMPOSE_PROJECT="dashboard-prod"
 COMPOSE_FILE="${CLONE_DIR}/compose.prod.yml"
 COMPOSE_ENV="${SECRETS_DIR}/.env.compose.prod"
-SUPERVISOR_WAS_RUNNING=false
-DEPLOY_SUCCEEDED=false
 
 cleanup() {
-    if [[ "$SUPERVISOR_WAS_RUNNING" == true && "$DEPLOY_SUCCEEDED" != true ]]; then
-        compose stop scheduler >/dev/null 2>&1 || true
-        sudo /usr/bin/supervisorctl start symfony_scheduler >/dev/null 2>&1 || true
-    fi
     echo "Nettoyage des secrets et fichiers temporaires..."
     rm -rf -- "$SECRETS_DIR" "$CLONE_DIR"
 }
@@ -117,17 +111,9 @@ compose run --rm --no-deps --user www-data php \
     php bin/console doctrine:migrations:migrate \
     --no-interaction --allow-no-migration --env=prod
 
-if [[ -x /usr/bin/supervisorctl ]] \
-    && sudo /usr/bin/supervisorctl status symfony_scheduler 2>/dev/null | grep -q RUNNING
-then
-    sudo /usr/bin/supervisorctl stop symfony_scheduler
-    SUPERVISOR_WAS_RUNNING=true
-fi
-
 echo "=== Démarrage des services applicatifs ==="
 compose up -d php web scheduler
 compose exec --user www-data --no-TTY php php bin/console about --env=prod
-DEPLOY_SUCCEEDED=true
 
 echo
 echo "Déploiement Docker terminé : ${TIMESTAMP}"
