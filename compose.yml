@@ -21,7 +21,7 @@ services:
     container_name: app_php
     volumes:
       - ./symfony:/var/www/html
-      - ${DIAPO_PATH:-./symfony/var/backgrounds}:${BACKGROUND_PATH:-/srv/backgrounds}:ro
+      - ${BACKGROUND_HOST_PATH:-./symfony/var/backgrounds}:${BACKGROUND_PATH:-/srv/backgrounds}:ro
     working_dir: /var/www/html/public
     environment:
       BACKGROUND_PATH: ${BACKGROUND_PATH:-/srv/backgrounds}

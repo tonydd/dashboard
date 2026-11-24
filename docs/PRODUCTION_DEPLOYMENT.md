@@ -38,12 +38,14 @@ Le script de déploiement s'attend à trouver dans l'archive GPG, extraite sous 
 - `.env` : variables Symfony et secrets backend existants.
 - `.env.vue` : configuration Vite commune.
 - `.env.production.vue` : configuration Vite de production.
-- `.env.compose.prod` : paramètres MySQL Docker et chemin `DIAPO_PATH`, basé sur `.env.compose.prod.example`.
+- `.env.compose.prod` : paramètres MySQL Docker et, facultativement, le dossier hôte des fonds d'écran (`BACKGROUND_HOST_PATH`), basé sur `.env.compose.prod.example`.
 - `database.sql.gz` : export initial de la base MySQL existante, requis uniquement lors du premier déploiement dans un volume vide.
 
 Ces fichiers doivent être à la racine de l'archive, pas dans un sous-dossier. `.env.compose.prod.example` et `.env.production.vue.example` sont des modèles du dépôt, pas des fichiers à inclure dans l'archive. Le script exige les quatre premiers fichiers et exige le dump seulement si le volume MySQL Docker est vide.
 
-Pour préparer l'archive, partir de l'archive actuelle, la déchiffrer dans un dossier temporaire sous `/dev/shm`, puis y ajouter ou remplacer `.env.compose.prod`. Copier les valeurs du modèle `.env.compose.prod.example` et renseigner les identifiants MySQL, deux ports loopback libres (`9100` pour l'API et `9101` pour le frontend par défaut), et le chemin absolu existant du dossier de fonds d'écran. Générer des mots de passe MySQL distincts, de préférence hexadécimaux, et ne jamais committer le fichier réel. Recréer ensuite le `tar.gz`, le chiffrer avec le même mécanisme GPG que l'archive actuelle, puis vérifier que le script `gpg --decrypt ... | tar xz` peut le lire. Ne remplacer l'archive de production qu'après cette vérification.
+Pour préparer l'archive, partir de l'archive actuelle, la déchiffrer dans un dossier temporaire sous `/dev/shm`, puis y ajouter ou remplacer `.env.compose.prod`. Copier les valeurs du modèle `.env.compose.prod.example` et renseigner les identifiants MySQL et deux ports loopback libres (`9100` pour l'API et `9101` pour le frontend par défaut). `BACKGROUND_HOST_PATH` est facultatif; s'il est omis, Compose utilise `./symfony/var/backgrounds` dans le checkout de déploiement. Générer des mots de passe MySQL distincts, de préférence hexadécimaux, et ne jamais committer le fichier réel. Recréer ensuite le `tar.gz`, le chiffrer avec le même mécanisme GPG que l'archive actuelle, puis vérifier que le script `gpg --decrypt ... | tar xz` peut le lire. Ne remplacer l'archive de production qu'après cette vérification.
+
+Le backend utilise toujours `BACKGROUND_PATH` pour servir le fond d'écran quotidien via `/api/background`. Si aucun fichier `.jpg` n'est présent dans le dossier monté, le déploiement ne bloque plus, mais cette route ne pourra pas fournir d'image.
 
 Pour créer le dump initial depuis la base MySQL actuelle, exécuter par exemple `mysqldump -u UTILISATEUR -p --single-transaction --routines --triggers --events --databases NOM_BASE | gzip > /dev/shm/database.sql.gz`, puis vérifier le résultat avec `gzip -t /dev/shm/database.sql.gz`. Le dump contient les données de production : le garder temporairement en RAM et le chiffrer dans l'archive. Conserver également une sauvegarde indépendante avant la bascule. Les redéploiements suivants n'ont pas besoin de `database.sql.gz` tant que le volume Docker contient déjà les tables.
 

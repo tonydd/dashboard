@@ -46,11 +46,6 @@ do
     fi
 done
 
-if [[ ! -d "$(awk -F= '/^DIAPO_PATH=/{sub(/^[^=]*=/, ""); print; exit}' "$COMPOSE_ENV")" ]]; then
-    echo "DIAPO_PATH doit désigner un dossier existant avec les images .jpg." >&2
-    exit 1
-fi
-
 echo "=== Préparation des fichiers de build frontend en RAM ==="
 awk '!/^[[:space:]]*(export[[:space:]]+)?VITE_SPOTIFY_CLIENT_SECRET[[:space:]]*=/' \
     "${SECRETS_DIR}/.env.vue" > "${SECRETS_DIR}/.env.vue.safe"

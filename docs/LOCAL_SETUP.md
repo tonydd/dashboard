@@ -51,7 +51,7 @@ DATABASE_URL="mysql://root:root@db:3306/symfony?serverVersion=8.0.39&charset=utf
 
 Cette URL doit être placée dans `symfony/.env.local`, qui est ignoré par Git. Pour un accès MySQL depuis l’hôte, utiliser `127.0.0.1:33061`.
 
-Les paramètres MySQL et le dossier de fonds d’écran peuvent être adaptés dans `.env`. Docker utilise `./symfony/var/backgrounds` par défaut.
+Les paramètres MySQL et le dossier hôte des fonds d’écran peuvent être adaptés dans `.env` avec `BACKGROUND_HOST_PATH`. Docker utilise `./symfony/var/backgrounds` par défaut.
 
 ## Pilotage du mode absence
 

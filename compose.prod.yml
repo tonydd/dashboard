@@ -37,7 +37,7 @@ services:
       DATABASE_URL: "mysql://${MYSQL_USER:?}:${MYSQL_PASSWORD:?}@database:3306/${MYSQL_DATABASE:?}?serverVersion=8.0.39&charset=utf8mb4"
       BACKGROUND_PATH: /srv/backgrounds
     volumes:
-      - ${DIAPO_PATH:?Set DIAPO_PATH in .env.compose.prod}:/srv/backgrounds:ro
+      - ${BACKGROUND_HOST_PATH:-./symfony/var/backgrounds}:/srv/backgrounds:ro
     depends_on:
       database:
         condition: service_healthy
@@ -63,7 +63,7 @@ services:
       ]
     environment: *app_environment
     volumes:
-      - ${DIAPO_PATH:?Set DIAPO_PATH in .env.compose.prod}:/srv/backgrounds:ro
+      - ${BACKGROUND_HOST_PATH:-./symfony/var/backgrounds}:/srv/backgrounds:ro
     depends_on:
       database:
         condition: service_healthy
