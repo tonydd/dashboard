@@ -22,7 +22,11 @@ onMounted(() => {
 
 async function fetchFuels() {
   try {
-    let response = await fetch(ConfigService.getConfig("FUEL_API_URL"), { method: "GET", mode: "cors" });
+    let response = await fetch(ConfigService.getConfig("FUEL_API_URL"), {
+      method: "GET",
+      mode: "cors",
+      credentials: "include",
+    });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }

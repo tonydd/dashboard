@@ -9,10 +9,13 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsCsrfTokenValid;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\String\Slugger\SluggerInterface;
 
+#[IsCsrfTokenValid('api', tokenKey: 'X-CSRF-Token', methods: ['PUT'], tokenSource: IsCsrfTokenValid::SOURCE_HEADER)]
 class IngredientsController extends AbstractController
 {
     private const PER_PAGE = 20;
@@ -76,6 +79,7 @@ class IngredientsController extends AbstractController
     }
 
     #[Route('/api/ingredients/{id}', name: 'ingredients_edit', methods: ['PUT'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function editIngredient(\App\Entity\Ingredient $ingredient, Request $request): JsonResponse
     {
         $name = $request->request->getString('name');

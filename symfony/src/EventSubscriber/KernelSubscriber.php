@@ -16,7 +16,6 @@ class KernelSubscriber implements EventSubscriberInterface
         'https://localhost:5174',
         'http://127.0.0.1:5174',
         'https://127.0.0.1:5174',
-        'http://dendrijver.duckdns.org',
         'https://dendrijver.duckdns.org',
     ];
 
@@ -36,27 +35,30 @@ class KernelSubscriber implements EventSubscriberInterface
     public function onRequest(RequestEvent $requestEvent): void
     {
         $request = $requestEvent->getRequest();
-        if ($request->getMethod() === 'OPTIONS' && $request->headers->has('Origin')) {
-            $response = new Response();
-            $response->headers->set('Access-Control-Allow-Origin', $request->headers->get('Origin'));
-            $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-            $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-            $response->headers->set('Access-Control-Max-Age', '3600');
-            $response->send();
-            exit;
-
+        $origin = $request->headers->get('Origin');
+        if ($request->getMethod() === 'OPTIONS' && $origin !== null && in_array($origin, self::ALLOWED_ORIGINS, true)) {
+            $response = new Response('', Response::HTTP_NO_CONTENT);
+            $this->addCorsHeaders($response, $origin);
+            $requestEvent->setResponse($response);
         }
     }
 
     public function onResponse(ResponseEvent $responseEvent): void
     {
         $request = $responseEvent->getRequest();
-        if ($request->headers->has('Origin') && in_array($request->headers->get('Origin'), self::ALLOWED_ORIGINS)) {
-            $response = $responseEvent->getResponse();
-            $response->headers->set('Access-Control-Allow-Origin', $request->headers->get('Origin'));
-            $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-            $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-            $response->headers->set('Access-Control-Max-Age', '3600');
+        $origin = $request->headers->get('Origin');
+        if ($origin !== null && in_array($origin, self::ALLOWED_ORIGINS, true)) {
+            $this->addCorsHeaders($responseEvent->getResponse(), $origin);
         }
     }
-}
+
+    private function addCorsHeaders(Response $response, string $origin): void
+    {
+        $response->headers->set('Access-Control-Allow-Origin', $origin);
+        $response->headers->set('Access-Control-Allow-Credentials', 'true');
+        $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+        $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CSRF-Token');
+        $response->headers->set('Access-Control-Max-Age', '3600');
+        $response->headers->set('Vary', 'Origin');
+    }
+}

@@ -25,7 +25,11 @@ export default {
   },
   methods: {
     getWaterHeaterData() {
-      fetch(ConfigService.getConfig('WATER_HEATER_API_URL'), {method: 'GET', mode: 'cors'})
+      fetch(ConfigService.getConfig('WATER_HEATER_API_URL'), {
+        method: 'GET',
+        mode: 'cors',
+        credentials: 'include',
+      })
           .then((res) => {
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return res.json();

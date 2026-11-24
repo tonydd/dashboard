@@ -21,7 +21,11 @@ onMounted(() => {
 
 async function fetchWaterQuality() {
   try {
-    let response = await fetch(ConfigService.getConfig("WATER_QUALITY_API_URL"), { method: "GET", mode: "cors" });
+    let response = await fetch(ConfigService.getConfig("WATER_QUALITY_API_URL"), {
+      method: "GET",
+      mode: "cors",
+      credentials: "include",
+    });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }

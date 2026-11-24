@@ -9,8 +9,11 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Component\Security\Http\Attribute\IsCsrfTokenValid;
 
 #[Route('/api/thermor')]
+#[IsCsrfTokenValid('api', tokenKey: 'X-CSRF-Token', methods: ['POST', 'DELETE'], tokenSource: IsCsrfTokenValid::SOURCE_HEADER)]
 class ThermorController extends AbstractController
 {
     public function __construct(
@@ -27,6 +30,7 @@ class ThermorController extends AbstractController
     }
 
     #[Route('/absence-mode', methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function enableAbsenceMode(Request $request): JsonResponse
     {
         if ($response = $this->authorizeControl($request)) {
@@ -37,6 +41,7 @@ class ThermorController extends AbstractController
     }
 
     #[Route('/absence-mode', methods: ['DELETE'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function disableAbsenceMode(Request $request): JsonResponse
     {
         if ($response = $this->authorizeControl($request)) {
@@ -65,4 +70,4 @@ class ThermorController extends AbstractController
 
         return null;
     }
-}
+}

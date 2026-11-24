@@ -15,12 +15,17 @@ Le projet n’est pas prêt à être lancé en mode zéro configuration : il né
 
 ```sh
 cp .env.example .env
-docker compose up --build
+docker compose up --build -d
 docker compose exec php sh -c 'cd /var/www/html && php bin/console doctrine:migrations:migrate --no-interaction'
+docker compose exec php sh -c 'cd /var/www/html && php bin/console app:dashboard:set-password'
 ```
 
 - Interface : `http://localhost:5174`
 - API : `http://localhost:8000`
+- En développement, Vite relaie `/api` vers Symfony pour conserver une origine unique malgré les ports séparés.
+- Le mot de passe est demandé de façon interactive et son hash est conservé en base ; aucun mot de passe n'est configuré dans le front.
+- Le compte tablette est en lecture seule ; les routes de création, modification et suppression sont réservées au rôle `ROLE_ADMIN`.
+- En production, expose l'interface et l'API uniquement en HTTPS pour protéger le cookie de session.
 
 Avant le premier démarrage, créer `symfony/.env.local` avec l’URL MySQL Docker décrite dans [docs/LOCAL_SETUP.md](docs/LOCAL_SETUP.md).
 

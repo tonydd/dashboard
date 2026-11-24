@@ -1,13 +1,16 @@
 <script>
 import Router from "@/components/core/Router.vue";
+import AuthGate from "@/components/AuthGate.vue";
 
 export default {
-  components: {Router},
+  components: {AuthGate, Router},
 };
 </script>
 
 <template>
-  <Router />
+  <AuthGate>
+    <Router />
+  </AuthGate>
 </template>
 
 <style scoped>

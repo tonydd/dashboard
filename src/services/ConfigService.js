@@ -1,6 +1,14 @@
 import DateService from "@/services/DateService.js";
 export default class ConfigService {
     static VITE_PREFIX = 'VITE_';
+    static API_CONFIGS = new Set([
+        'API_BASE_URL',
+        'FUEL_API_URL',
+        'SOLAR_API_URL',
+        'WATER_HEATER_API_URL',
+        'WATER_QUALITY_API_URL',
+        'BACKGROUND_URL',
+    ]);
 
 
     static getBooleanConfig(name) {
@@ -8,8 +16,26 @@ export default class ConfigService {
         return (value === 'true');
     }
     static getConfig(name, defaultValue = null) {
-        const value = import.meta.env[`${ConfigService.VITE_PREFIX}${name}`];
-        return value || defaultValue;
+        const value = import.meta.env[`${ConfigService.VITE_PREFIX}${name}`] || defaultValue;
+
+        if (!import.meta.env.DEV || typeof value !== 'string' || !ConfigService.API_CONFIGS.has(name)) {
+            return value;
+        }
+
+        try {
+            const url = new URL(value, window.location.origin);
+            if (!['localhost', '127.0.0.1'].includes(url.hostname)) {
+                return value;
+            }
+
+            if (name === 'API_BASE_URL') {
+                return '/api';
+            }
+
+            return `${url.pathname}${url.search}${url.hash}`;
+        } catch {
+            return value;
+        }
     }
 
     static getIntervalConfig(name, defaultValue = 60000) { // 60 secondes par défaut

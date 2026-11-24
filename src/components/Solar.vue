@@ -24,7 +24,7 @@ export default {
     fetchSolarOutput() {
       const now = DateService.now();
       if (SolarService.isSolarProductionPeriod(now)) {
-        fetch(ConfigService.getConfig('SOLAR_API_URL'), {mode: "cors"})
+        fetch(ConfigService.getConfig('SOLAR_API_URL'), {mode: "cors", credentials: "include"})
           .then(res => {
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return res.json();

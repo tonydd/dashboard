@@ -20,9 +20,12 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\HttpKernel\KernelInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsCsrfTokenValid;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\String\Slugger\SluggerInterface;
 
+#[IsCsrfTokenValid('api', tokenKey: 'X-CSRF-Token', methods: ['POST', 'DELETE'], tokenSource: IsCsrfTokenValid::SOURCE_HEADER)]
 class RecipeController extends AbstractController
 {
     public function __construct(
@@ -58,6 +61,7 @@ class RecipeController extends AbstractController
     }
 
     #[Route('/api/recipe/{id}', name: 'recipe_delete', methods: ['DELETE'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function deleteRecipe(Recipe $recipe): JsonResponse
     {
         $this->entityManager->remove($recipe);
@@ -74,6 +78,7 @@ class RecipeController extends AbstractController
     }
 
     #[Route('/api/recipes', name: 'recipe_create', methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function createRecipe(
         RecipeRepository               $recipeRepository,
         TagRepository                  $tagRepository,
