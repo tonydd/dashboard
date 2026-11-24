@@ -23,7 +23,7 @@ class ThermorController extends AbstractController
     public function __invoke(CurrentStatValueRepository $currentStatValueRepository): JsonResponse
     {
         $currentStatValue = $currentStatValueRepository->findOneBy(['type' => StatValueType::Thermor]);
-        return $this->json($currentStatValue->getValue() ?? []);
+        return $this->json($currentStatValue?->getValue() ?? []);
     }
 
     #[Route('/absence-mode', methods: ['POST'])]

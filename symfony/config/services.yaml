@@ -18,7 +18,8 @@ parameters:
     overkizEndpointUrl: '%env(string:OVERKIZ_ENDPOINT_URL)%'
     overkizEndpointCommandUrl: '%env(string:OVERKIZ_ENDPOINT_COMMAND_URL)%'
     backgroundPath: '%env(string:BACKGROUND_PATH)%'
-    thermorApiToken: '%env(string:THERMOR_API_TOKEN)%'
+    thermorApiTokenDefault: ''
+    thermorApiToken: '%env(string:default:thermorApiTokenDefault:THERMOR_API_TOKEN)%'
     appTimezone: '%env(string:APP_TIMEZONE)%'
 
 services:

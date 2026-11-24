@@ -43,6 +43,8 @@ Le script de déploiement s'attend à trouver dans l'archive GPG, extraite sous 
 
 Ces fichiers doivent être à la racine de l'archive, pas dans un sous-dossier. `.env.compose.prod.example` et `.env.production.vue.example` sont des modèles du dépôt, pas des fichiers à inclure dans l'archive. Le script exige les quatre premiers fichiers et exige le dump seulement si le volume MySQL Docker est vide.
 
+`THERMOR_API_TOKEN` est facultatif : sans cette variable, la lecture de l'état du chauffe-eau reste disponible, mais les commandes de pilotage répondent `503` jusqu'à sa configuration.
+
 Pour préparer l'archive, partir de l'archive actuelle, la déchiffrer dans un dossier temporaire sous `/dev/shm`, puis y ajouter ou remplacer `.env.compose.prod`. Copier les valeurs du modèle `.env.compose.prod.example` et renseigner les identifiants MySQL et deux ports loopback libres (`9100` pour l'API et `9101` pour le frontend par défaut). `BACKGROUND_HOST_PATH` est facultatif; s'il est omis, Compose utilise `./symfony/var/backgrounds` dans le checkout de déploiement. Générer des mots de passe MySQL distincts, de préférence hexadécimaux, et ne jamais committer le fichier réel. Recréer ensuite le `tar.gz`, le chiffrer avec le même mécanisme GPG que l'archive actuelle, puis vérifier que le script `gpg --decrypt ... | tar xz` peut le lire. Ne remplacer l'archive de production qu'après cette vérification.
 
 Le backend utilise toujours `BACKGROUND_PATH` pour servir le fond d'écran quotidien via `/api/background`. Si aucun fichier `.jpg` n'est présent dans le dossier monté, le déploiement ne bloque plus, mais cette route ne pourra pas fournir d'image.

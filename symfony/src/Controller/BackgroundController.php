@@ -43,11 +43,19 @@ class BackgroundController extends AbstractController
 
     private function getRandomBackground(string $backgroundPath): string
     {
+        if (!is_dir($backgroundPath)) {
+            throw $this->createNotFoundException('No background images are configured.');
+        }
+
         $backgrounds = [];
         foreach (scandir($backgroundPath) as $file) {
             if (str_ends_with($file, '.jpg')) {
                 $backgrounds[] = $file;
             }
+        }
+
+        if ($backgrounds === []) {
+            throw $this->createNotFoundException('No background images are configured.');
         }
 
         return $backgrounds[array_rand($backgrounds)];

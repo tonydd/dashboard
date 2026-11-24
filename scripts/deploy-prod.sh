@@ -125,7 +125,7 @@ fi
 
 echo "=== Démarrage des services applicatifs ==="
 compose up -d php web scheduler
-compose exec --no-TTY php php bin/console about --env=prod
+compose exec --user www-data --no-TTY php php bin/console about --env=prod
 DEPLOY_SUCCEEDED=true
 
 echo
