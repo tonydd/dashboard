@@ -43,22 +43,67 @@ cleanup() {
 }
 trap cleanup EXIT
 
+packet_info=$(gpg --list-packets "$archive" 2>&1 || true)
 mapfile -t recipients < <(
-    gpg --list-packets "$archive" 2>/dev/null |
+    printf '%s\n' "$packet_info" |
         sed -nE 's/.*keyid ([[:xdigit:]]+).*/\1/p' |
         sort -u
 )
-if [[ -n "${GPG_RECIPIENT:-}" ]]; then
+sym_cipher_id=$(printf '%s\n' "$packet_info" |
+    sed -nE 's/.*symkey enc packet:.*cipher ([0-9]+).*/\1/p' |
+    head -n 1)
+
+if [[ ${#recipients[@]} -gt 0 ]]; then
+    encryption_mode=public-key
+    if [[ -n "${GPG_RECIPIENT:-}" ]]; then
+        recipients=("$GPG_RECIPIENT")
+    fi
+elif [[ -n "$sym_cipher_id" ]]; then
+    encryption_mode=symmetric
+    case "$sym_cipher_id" in
+        7) cipher=AES ;;
+        8) cipher=AES192 ;;
+        9) cipher=AES256 ;;
+        *)
+            echo "Algorithme de chiffrement symétrique non pris en charge: ${sym_cipher_id}." >&2
+            exit 1
+            ;;
+    esac
+elif [[ -n "${GPG_RECIPIENT:-}" ]]; then
+    encryption_mode=public-key
     recipients=("$GPG_RECIPIENT")
-fi
-if [[ ${#recipients[@]} -eq 0 ]]; then
-    echo "Destinataire GPG introuvable; définissez GPG_RECIPIENT puis réessayez." >&2
+else
+    echo "Impossible de déterminer le mode de chiffrement GPG de l'archive." >&2
     exit 1
 fi
 
+passphrase=
+if [[ "$encryption_mode" == symmetric ]]; then
+    if [[ ! -r /dev/tty ]]; then
+        echo "Un terminal interactif est requis pour saisir la phrase secrète GPG." >&2
+        exit 1
+    fi
+    IFS= read -r -s -p "Phrase secrète GPG: " passphrase < /dev/tty
+    printf '\n' > /dev/tty
+    if [[ -z "$passphrase" ]]; then
+        echo "La phrase secrète ne peut pas être vide." >&2
+        exit 1
+    fi
+fi
+
+decrypt_archive() {
+    if [[ "$encryption_mode" == symmetric ]]; then
+        printf '%s\n' "$passphrase" |
+            gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+                --output "$2" --decrypt "$1"
+    else
+        gpg --output "$2" --decrypt "$1"
+    fi
+}
+
 original_hash=$(sha256sum "$archive" | awk '{print $1}')
 mkdir -m 700 "$work_dir/unpacked"
-gpg --output "$work_dir/original.tar.gz" --decrypt "$archive"
+decrypt_archive "$archive" "$work_dir/original.tar.gz"
 tar -xzf "$work_dir/original.tar.gz" -C "$work_dir/unpacked" --no-same-owner
 
 mapfile -d '' env_files < <(find "$work_dir/unpacked" -type f -name '.env*' -print0)
@@ -90,13 +135,20 @@ done
 tar -czf "$work_dir/updated.tar.gz" -C "$work_dir/unpacked" .
 gzip -t "$work_dir/updated.tar.gz"
 
-gpg_args=(--output "$work_dir/updated.tar.gz.gpg" --encrypt)
-for recipient in "${recipients[@]}"; do
-    gpg_args+=(--recipient "$recipient")
-done
-gpg "${gpg_args[@]}" "$work_dir/updated.tar.gz"
+if [[ "$encryption_mode" == symmetric ]]; then
+    printf '%s\n' "$passphrase" |
+        gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --output "$work_dir/updated.tar.gz.gpg" --symmetric \
+            --cipher-algo "$cipher" "$work_dir/updated.tar.gz"
+else
+    gpg_args=(--output "$work_dir/updated.tar.gz.gpg" --encrypt)
+    for recipient in "${recipients[@]}"; do
+        gpg_args+=(--recipient "$recipient")
+    done
+    gpg "${gpg_args[@]}" "$work_dir/updated.tar.gz"
+fi
 
-gpg --output "$work_dir/verified.tar.gz" --decrypt "$work_dir/updated.tar.gz.gpg"
+decrypt_archive "$work_dir/updated.tar.gz.gpg" "$work_dir/verified.tar.gz"
 mkdir -m 700 "$work_dir/verified"
 tar -xzf "$work_dir/verified.tar.gz" -C "$work_dir/verified" --no-same-owner
 for env_path in "${matched_env_paths[@]}"; do
