@@ -23,7 +23,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  *   - publisher → server: {status,cameraOn} {offer,to,sdp} {ice,to,candidate}
  *   - viewer → server:    {watch,to} {cameras} {answer,sdp} {ice,candidate}
  *   - server → publisher: {registered,id,viewers} {viewer-joined,viewerId} {viewer-left,viewerId} {evicted}
- *   - server → viewer:    {cameras,list:[{id,name,cameraOn}]} {offer,sdp} {ice,candidate} {publisher-left} {publisher-stopped}
+ *   - server → viewer:    {cameras,list:[{id,name,cameraOn}]} {watching,to} {offer,sdp} {ice,candidate} {publisher-left} {publisher-stopped}
  */
 #[AsCommand(
     name: 'app:camera:ws',
@@ -251,6 +251,7 @@ class CameraSignalingCommand extends Command
                 foreach ($this->clients as $viewerKey => $viewer) {
                     if ($viewer['role'] === CameraTokenService::ROLE_VIEWER && $viewer['watched'] === $otherKey) {
                         $this->clients[$viewerKey]['watched'] = $key;
+                        $this->sendJson($viewer['socket'], ['type' => 'watching', 'to' => $this->clients[$key]['id']]);
                     }
                 }
             }
@@ -532,6 +533,8 @@ class CameraSignalingCommand extends Command
                 }
                 $this->clients[$key]['watched'] = $publisherKey;
                 $this->sendJson($publisher['socket'], ['type' => 'viewer-joined', 'viewerId' => $client['id']]);
+                // Acknowledge the binding so viewers stop re-watching.
+                $this->sendJson($client['socket'], ['type' => 'watching', 'to' => $publisher['id']]);
 
                 return;
             }

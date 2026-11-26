@@ -485,10 +485,18 @@ dialog::backdrop {
 .camera-page {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
+  /* dvh follows the mobile browser toolbar so the bottom bar stays visible without scrolling. */
+  height: 100vh;
+  height: 100dvh;
   width: 100vw;
-  min-height: 100vh;
   padding: 0;
   background: #000;
+}
+
+/* The dev profiler toolbar would break the fullscreen camera layout. */
+.camera-page ~ .sf-toolbar,
+.camera-page ~ .sf-toolbar-clearer {
+  display: none;
 }
 
 .camera-header {

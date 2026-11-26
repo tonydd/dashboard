@@ -40,7 +40,10 @@ async function openCameraSocket(role, onMessage, extraParams = {}) {
   const socket = new WebSocket(`${cameraSocketUrl()}?${params}`);
   socket.onmessage = (event) => {
     try {
-      onMessage(JSON.parse(event.data));
+      const handled = onMessage(JSON.parse(event.data));
+      if (handled instanceof Promise) {
+        handled.catch((error) => logClientFailure(`Camera signal async (${role})`, error));
+      }
     } catch (error) {
       logClientFailure(`Camera signal parse (${role})`, error);
     }
@@ -261,7 +264,8 @@ function initCameraPublisher() {
     setToggleState('on');
     connect();
     sendStatus();
-    viewers.forEach((_, viewerId) => createPeerAndOffer(viewerId));
+    // Bound viewers are re-handed to us by the server on the status ON above
+    // (viewer-joined); offering to them here too would race the renegotiation.
   });
 
   connect();
@@ -286,6 +290,11 @@ function initCameraViewer() {
   let stopped = false;
   let selectedId = null;
   let selectedName = '';
+  // Camera id whose watch request the server acknowledged; a pending
+  // (unacknowledged) watch is retried by the healthcheck, an acknowledged
+  // binding must never be restarted (it would kill the pending negotiation).
+  let boundId = null;
+  let lastCameras = [];
 
   const setStatus = (text) => {
     if (status) status.textContent = text;
@@ -301,10 +310,12 @@ function initCameraViewer() {
 
   const watchCamera = (camera) => {
     if (socketState !== 'open') return;
+    if (camera.id === selectedId && camera.id === boundId) return;
+    if (camera.id !== selectedId) closePeer();
     selectedId = camera.id;
     selectedName = camera.name;
-    closePeer();
     socket.send(JSON.stringify({ type: 'watch', to: camera.id }));
+    renderCameras(lastCameras);
     setStatus(`Connexion à ${camera.name}…`);
   };
 
@@ -331,6 +342,7 @@ function initCameraViewer() {
     switch (message.type) {
       case 'cameras': {
         const cameras = message.list || [];
+        lastCameras = cameras;
         renderCameras(cameras);
 
         // A camera vanished (server restart, disconnect): give up on it.
@@ -339,6 +351,7 @@ function initCameraViewer() {
           setStatus(`${selectedName} est déconnectée; nouvel essai dès son retour…`);
           selectedId = null;
           selectedName = '';
+          boundId = null;
         }
 
         const active = cameras.filter((camera) => camera.cameraOn);
@@ -347,7 +360,9 @@ function initCameraViewer() {
           break;
         }
         if (active.length === 0) {
-          setStatus('Aucune caméra active.');
+          setStatus(selectedId !== null
+            ? `${selectedName} a arrêté le partage; en attente…`
+            : 'Aucune caméra active.');
           break;
         }
 
@@ -365,11 +380,14 @@ function initCameraViewer() {
         }
 
         const current = cameras.find((camera) => camera.id === selectedId);
-        if (current && current.cameraOn && !peer) {
+        if (current && current.cameraOn) {
           watchCamera(current);
         }
         break;
       }
+      case 'watching':
+        boundId = message.to;
+        break;
       case 'offer':
         setStatus(`Connexion à ${selectedName}…`);
         await acceptOffer(message.sdp);
@@ -395,29 +413,41 @@ function initCameraViewer() {
   };
 
   const acceptOffer = async (offerSdp) => {
+    const pc = createPeerConnection();
     closePeer();
-    peer = createPeerConnection();
-    peer.ontrack = (event) => {
+    peer = pc;
+    pc.ontrack = (event) => {
       if (video.srcObject !== event.streams[0]) {
         video.srcObject = event.streams[0];
         video.play().catch((error) => logClientFailure('Camera viewer play', error));
         setStatus('');
       }
     };
-    peer.onconnectionstatechange = () => {
+    pc.onconnectionstatechange = () => {
       // Dropping the dead peer lets the healthcheck re-watch the camera.
-      if (peer && ['failed', 'disconnected', 'closed'].includes(peer.connectionState)) {
+      if (pc && ['failed', 'disconnected', 'closed'].includes(pc.connectionState)) {
         closePeer();
       }
     };
-    peer.onicecandidate = (event) => {
+    pc.onicecandidate = (event) => {
       if (event.candidate) {
         socketState === 'open' && socket.send(JSON.stringify({ type: 'ice', candidate: event.candidate.toJSON() }));
       }
     };
-    await peer.setRemoteDescription({ type: 'offer', sdp: offerSdp });
-    const answer = await peer.createAnswer();
-    await peer.setLocalDescription(answer);
+    await pc.setRemoteDescription({ type: 'offer', sdp: offerSdp });
+    // A newer offer may have replaced this negotiation while we awaited.
+    if (peer !== pc) {
+      pc.close();
+
+      return;
+    }
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    if (peer !== pc) {
+      pc.close();
+
+      return;
+    }
     socketState === 'open' && socket.send(JSON.stringify({ type: 'answer', sdp: answer.sdp }));
   };
 
@@ -441,6 +471,8 @@ function initCameraViewer() {
         };
         socket.onclose = () => {
           socketState = 'closed';
+          // The signaling server dropped our bindings with it.
+          boundId = null;
           if (!stopped) {
             closePeer();
             retryTimer = setTimeout(connect, CONNECTION_RETRY_DELAY_MS);
