@@ -86,6 +86,56 @@ final class ThermorScheduleServiceTest extends TestCase
         $this->serviceWithSchedule($schedule)->getSchedule();
     }
 
+    public function testSetScheduleValidatesAndPersistsInCanonicalOrder(): void
+    {
+        $repository = $this->createMock(KeyValueRepository::class);
+        $repository->expects($this->once())
+            ->method('setValue')
+            ->with(KeyValueKey::ThermorSchedule, $this->callback(static function (array $schedule): bool {
+                return array_keys($schedule['days']) === ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+                    && $schedule['days']['monday'] === [
+                        ['start' => '00:00', 'end' => '05:00'],
+                        ['start' => '22:00', 'end' => '23:30'],
+                    ]
+                    && $schedule['days']['sunday'] === [];
+            }));
+
+        $scheduleService = new ThermorScheduleService($repository);
+        $days = array_fill_keys(
+            ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
+            [],
+        );
+        // Days deliberately out of canonical order, periods ordered and
+        // non-overlapping.
+        $days['monday'] = [
+            ['start' => '00:00', 'end' => '05:00'],
+            ['start' => '22:00', 'end' => '23:30'],
+        ];
+
+        $stored = $scheduleService->setSchedule(['days' => $days]);
+
+        self::assertSame('00:00', $stored['days']['monday'][0]['start']);
+        self::assertSame([], $stored['days']['sunday']);
+    }
+
+    public function testSetScheduleRejectsOverlappingPeriods(): void
+    {
+        $repository = $this->createMock(KeyValueRepository::class);
+        $repository->expects($this->never())->method('setValue');
+
+        $days = array_fill_keys(
+            ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+            [],
+        );
+        $days['monday'] = [
+            ['start' => '01:00', 'end' => '04:00'],
+            ['start' => '03:00', 'end' => '05:00'],
+        ];
+
+        $this->expectException(\InvalidArgumentException::class);
+        (new ThermorScheduleService($repository))->setSchedule(['days' => $days]);
+    }
+
     public static function invalidSchedules(): iterable
     {
         yield 'invalid time' => [[['start' => '8:00', 'end' => '09:00']]];

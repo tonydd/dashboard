@@ -83,6 +83,24 @@ final readonly class ThermorScheduleService
         return $schedule;
     }
 
+    /**
+     * Validate and replace the off-peak schedule. Days are normalized in the
+     * canonical order with list-indexed periods before persisting.
+     */
+    public function setSchedule(array $schedule): array
+    {
+        $this->validateSchedule($schedule);
+
+        $normalized = ['days' => []];
+        foreach (self::DAYS as $day) {
+            $normalized['days'][$day] = array_values($schedule['days'][$day]);
+        }
+
+        $this->keyValueRepository->setValue(KeyValueKey::ThermorSchedule, $normalized);
+
+        return $normalized;
+    }
+
     private function defaultSchedule(): array
     {
         return [

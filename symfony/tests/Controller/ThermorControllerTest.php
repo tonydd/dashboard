@@ -141,6 +141,88 @@ final class ThermorControllerTest extends WebTestCase
         return $session['csrfToken'];
     }
 
+    public function testOffPeakScheduleIsDeniedToViewers(): void
+    {
+        $client = static::createClient();
+        $client->loginUser($this->persistUser('thermor-actions-viewer', ['ROLE_VIEWER']));
+
+        $client->request(
+            'POST',
+            '/api/thermor/actions/off-peak-schedule',
+            [],
+            [],
+            ['HTTP_X_CSRF_TOKEN' => $this->csrfToken($client)],
+            '{"days": {}}',
+        );
+
+        self::assertResponseStatusCodeSame(403);
+    }
+
+    public function testOffPeakScheduleRejectsAMissingDaysObject(): void
+    {
+        $client = static::createClient();
+        $client->loginUser($this->persistUser('thermor-actions-admin', ['ROLE_ADMIN']));
+
+        $client->request(
+            'POST',
+            '/api/thermor/actions/off-peak-schedule',
+            [],
+            [],
+            ['HTTP_X_CSRF_TOKEN' => $this->csrfToken($client)],
+            '{"periods": []}',
+        );
+
+        self::assertResponseStatusCodeSame(400);
+    }
+
+    public function testOffPeakScheduleRejectsInvalidPeriods(): void
+    {
+        $client = static::createClient();
+        $client->loginUser($this->persistUser('thermor-actions-admin', ['ROLE_ADMIN']));
+
+        $client->request(
+            'POST',
+            '/api/thermor/actions/off-peak-schedule',
+            [],
+            [],
+            ['HTTP_X_CSRF_TOKEN' => $this->csrfToken($client)],
+            '{"days": {"monday": [{"start": "22:00", "end": "01:00"}]}}',
+        );
+
+        self::assertResponseStatusCodeSame(422);
+    }
+
+    public function testOffPeakScheduleStoresMultiplePeriodsPerDay(): void
+    {
+        $client = static::createClient();
+        $client->loginUser($this->persistUser('thermor-actions-admin', ['ROLE_ADMIN']));
+
+        $days = [
+            'monday' => [['start' => '00:00', 'end' => '05:00'], ['start' => '22:30', 'end' => '23:45']],
+            'tuesday' => [],
+            'wednesday' => [['start' => '01:00', 'end' => '07:00']],
+            'thursday' => [],
+            'friday' => [],
+            'saturday' => [['start' => '00:30', 'end' => '08:00']],
+            'sunday' => [],
+        ];
+
+        $client->request(
+            'POST',
+            '/api/thermor/actions/off-peak-schedule',
+            [],
+            [],
+            ['HTTP_X_CSRF_TOKEN' => $this->csrfToken($client)],
+            json_encode(['days' => $days]),
+        );
+
+        self::assertResponseIsSuccessful();
+        self::assertSame(
+            $days,
+            json_decode($client->getResponse()->getContent(), true)['schedule']['days'],
+        );
+    }
+
     private function persistUser(string $username, array $roles): DashboardUser
     {
         $entityManager = static::getContainer()->get('doctrine')->getManager();

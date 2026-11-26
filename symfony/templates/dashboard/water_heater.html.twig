@@ -127,21 +127,33 @@
 
   <section class="widget water-heater-schedule">
     <h2>Planification heures creuses</h2>
-    <table class="thermor-table">
-      <thead><tr><th>Jour</th><th>Heures creuses</th></tr></thead>
-      <tbody>
-        {% for day, periods in schedule.days %}
-          <tr>
-            <td>{{ {monday: 'Lundi', tuesday: 'Mardi', wednesday: 'Mercredi', thursday: 'Jeudi', friday: 'Vendredi', saturday: 'Samedi', sunday: 'Dimanche'}[day] }}</td>
-            <td>
-              {% for period in periods %}
-                {{ period.start }}–{{ period.end }}{% if not loop.last %}, {% endif %}
-              {% endfor %}
-            </td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <p class="thermor-hint">
+      Créneaux pendant lesquels le chauffe-eau est réactivé (mode absence
+      désactivé). La reconduction prend effet à la minute suivante.
+    </p>
+    <p class="thermor-result" data-thermor-result hidden aria-live="polite"></p>
+    <form data-thermor-schedule>
+      {% set dayLabels = {
+        monday: 'Lundi', tuesday: 'Mardi', wednesday: 'Mercredi', thursday: 'Jeudi',
+        friday: 'Vendredi', saturday: 'Samedi', sunday: 'Dimanche',
+      } %}
+      {% for day, periods in schedule.days %}
+        <fieldset class="schedule-day" data-day="{{ day }}">
+          <legend>{{ dayLabels[day] }}</legend>
+          <div class="schedule-periods">
+            {% for period in periods %}
+              <div class="schedule-period">
+                <input type="time" value="{{ period.start }}" data-period-start required> →
+                <input type="time" value="{{ period.end }}" data-period-end required>
+                <button type="button" data-remove-period aria-label="Supprimer ce créneau">✕</button>
+              </div>
+            {% endfor %}
+          </div>
+          <button type="button" data-add-period>+ Créneau</button>
+        </fieldset>
+      {% endfor %}
+      <button type="submit" data-thermor-action>Enregistrer les heures creuses</button>
+    </form>
     {% if rateLimit %}
       <p class="thermor-hint">
         Budget d'appels : {{ rateLimit.tokens|default('—') }} jetons,

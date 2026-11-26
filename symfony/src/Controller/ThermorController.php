@@ -6,6 +6,7 @@ use App\Enum\KeyValueKey;
 use App\Exception\OverkizApiException;
 use App\Exception\ThermorRateLimitedException;
 use App\Repository\KeyValueRepository;
+use App\Service\ThermorScheduleService;
 use App\Service\ThermorService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -21,6 +22,7 @@ class ThermorController extends AbstractController
 {
     public function __construct(
         private readonly ThermorService $thermorService,
+        private readonly ThermorScheduleService $scheduleService,
         private readonly string $thermorApiToken,
     ) {
     }
@@ -176,6 +178,30 @@ class ThermorController extends AbstractController
     public function actionSyncClock(): JsonResponse
     {
         return $this->applyAction(fn (): array => $this->thermorService->synchronizeDateTime());
+    }
+
+    /**
+     * Local configuration only: never calls the Overkiz cloud, so no rate
+     * limit applies. The off-peak reconciliation picks the change up on its
+     * next tick.
+     */
+    #[Route('/actions/off-peak-schedule', methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function actionOffPeakSchedule(Request $request): JsonResponse
+    {
+        $payload = $this->jsonPayload($request);
+        $days = $payload['days'] ?? null;
+        if (!is_array($days)) {
+            throw new BadRequestHttpException('The "days" field must be an object.');
+        }
+
+        try {
+            $schedule = $this->scheduleService->setSchedule(['days' => $days]);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], JsonResponse::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        return $this->json(['schedule' => $schedule]);
     }
 
     private function applyAction(callable $action): JsonResponse

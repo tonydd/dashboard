@@ -965,3 +965,72 @@ dialog::backdrop {
   font-size: 12px;
   font-weight: 400;
 }
+
+.schedule-day {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+}
+
+.schedule-day legend {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 0 4px;
+}
+
+.schedule-periods {
+  display: grid;
+  gap: 6px;
+}
+
+.schedule-period {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.schedule-period input[type='time'] {
+  min-height: 38px;
+  padding: 4px 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: #17232d;
+  color: inherit;
+  font-size: 15px;
+}
+
+.schedule-period button,
+.schedule-day [data-add-period] {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.schedule-day [data-add-period] {
+  justify-self: start;
+}
+
+form[data-thermor-schedule] > button[type='submit'] {
+  min-height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #20170d;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+form[data-thermor-schedule] > button[type='submit']:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
