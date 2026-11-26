@@ -21,7 +21,7 @@ class StatusController extends AbstractController
 
     // The scheduler emits messages every minute; beyond this the consumer is dead.
     private const HEARTBEAT_STALE_SECONDS = 300;
-    private const CAMERA_WS_TIMEOUT_SECONDS = 2.0;
+    private const CAMERA_WS_TIMEOUT_SECONDS = 1.0;
 
     public function __construct(
         private readonly KeyValueRepository $keyValues,

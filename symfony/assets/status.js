@@ -1,4 +1,4 @@
-const STATUS_POLL_INTERVAL_MS = 30000;
+const STATUS_POLL_INTERVAL_MS = 2000;
 
 const FEED_LABELS = {
   solar: 'Solaire',
