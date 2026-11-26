@@ -35,7 +35,7 @@ class CameraSignalingCommand extends Command
     private const STALE_SECONDS = 120;
     private const PING_INTERVAL_SECONDS = 30;
     private const CLOSE_INVALID_TOKEN = 4001;
-    private const CLOSE_PUBLISHER_BUSY = 4002;
+    private const CLOSE_EVICTED = 4002;
 
     /**
      * @var array<int, array{socket: resource, id: string, role: string, buffer: string, fragment: string, lastSeen: int}>
@@ -215,15 +215,15 @@ class CameraSignalingCommand extends Command
 
         if ($role === CameraTokenService::ROLE_PUBLISHER) {
             if ($this->publisherId !== null) {
-                ($this->log)('Rejected publisher: another publisher is already streaming.');
-                $this->sendJson($this->clients[$key]['socket'], [
-                    'type' => 'error',
-                    'code' => 'publisher_busy',
-                    'message' => 'Une autre tablette diffuse déjà sa caméra.',
-                ]);
-                $this->closeConnection($key, false, self::CLOSE_PUBLISHER_BUSY);
-
-                return;
+                // A followed-up register means the previous publisher died (page reload);
+                // evict it instead of leaving the room locked until the stale timeout.
+                ($this->log)('Evicting previous publisher.');
+                $previous = $this->publisherId;
+                $this->publisherId = null;
+                if (isset($this->clients[$previous])) {
+                    $this->sendJson($this->clients[$previous]['socket'], ['type' => 'evicted']);
+                    $this->closeConnection($previous, true, self::CLOSE_EVICTED, false);
+                }
             }
             $this->publisherId = $key;
             $this->clients[$key]['id'] = 'publisher';
@@ -499,7 +499,7 @@ class CameraSignalingCommand extends Command
         @fwrite($socket, $header.$payload);
     }
 
-    private function closeConnection(int $key, bool $withCloseFrame = true, int $closeCode = 1000): void
+    private function closeConnection(int $key, bool $withCloseFrame = true, int $closeCode = 1000, bool $announce = true): void
     {
         if (!isset($this->clients[$key])) {
             return;
@@ -510,10 +510,12 @@ class CameraSignalingCommand extends Command
             if ($this->publisherId === $key) {
                 $this->publisherId = null;
             }
-            if ($withCloseFrame) {
+            if ($withCloseFrame && $announce) {
                 ($this->log)('Publisher left; notifying viewers.');
             }
-            $this->broadcastToViewers('publisher-left');
+            if ($announce) {
+                $this->broadcastToViewers('publisher-left');
+            }
         }
 
         if ($client['role'] === CameraTokenService::ROLE_VIEWER) {

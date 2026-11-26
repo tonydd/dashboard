@@ -128,6 +128,9 @@ function initCameraPublisher() {
           if (mediaStream) createPeerAndOffer(viewerId);
         });
         break;
+      case 'evicted':
+        // Another tablet page took the room; stop the fight and wait for a reload.
+        sessionExpired = true;
       case 'viewer-joined':
         viewers.set(message.viewerId, null);
         if (mediaStream) createPeerAndOffer(message.viewerId);
