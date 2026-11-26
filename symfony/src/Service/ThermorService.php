@@ -3,6 +3,8 @@
 namespace App\Service;
 
 use App\Entity\WaterHeaterStat;
+use App\Exception\OverkizApiException;
+use App\Exception\ThermorRateLimitedException;
 use App\Repository\KeyValueRepository;
 use App\Repository\WaterHeaterStatRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -15,6 +17,9 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 final readonly class ThermorService
 {
+    private const SETUP_CACHE_KEY = 'thermorSetupData';
+    private const SETUP_CACHE_TTL = 55;
+
     public function __construct(
         private EntityManagerInterface     $entityManager,
         private CacheInterface             $cache,
@@ -25,6 +30,7 @@ final readonly class ThermorService
         private HttpClientInterface        $httpClient,
         private LoggerInterface            $logger,
         private ThermorStateParser         $stateParser,
+        private ThermorApiRateLimiter      $rateLimiter,
         private string                     $atlanticTokenUrl = '',
         private string                     $atlanticTokenAuthorization = '',
         private string                     $atlanticUsername = '',
@@ -54,10 +60,8 @@ final readonly class ThermorService
 
     private function applyAbsenceMode(bool $enabled, bool $skipIfAlreadyInRequestedState): array
     {
-        $atlanticToken = $this->atlanticToken();
-        $magellanToken = $this->magellanToken($atlanticToken);
-        $cookieValue = $this->endUserAPILogin($magellanToken);
-        $setup = $this->setup($cookieValue);
+        $setup = $this->fetchSetup();
+        $cookieValue = $this->endUserAPILogin($this->magellanToken($this->atlanticToken()));
 
         $heater = null;
         foreach ($setup['devices'] ?? [] as $device) {
@@ -137,9 +141,18 @@ final readonly class ThermorService
             }
         }
 
-        foreach ($commands as $command) {
-            $this->execCommand($cookieValue, $heater['deviceURL'], $command['name'], $command['parameters']);
+        try {
+            $this->runCommands($cookieValue, $heater['deviceURL'], $commands);
+        } catch (OverkizApiException $e) {
+            if (!$e->isSessionError()) {
+                throw $e;
+            }
+            // The session died mid-way; commands are idempotent, re-apply
+            // them all with a fresh session.
+            $cookieValue = $this->endUserAPILogin($this->magellanToken($this->atlanticToken()), true);
+            $this->runCommands($cookieValue, $heater['deviceURL'], $commands);
         }
+        $this->cache->delete(self::SETUP_CACHE_KEY);
 
         return [
             'enabled' => $enabled,
@@ -163,10 +176,7 @@ final readonly class ThermorService
 
     public function update(): void
     {
-        $atlanticToken = $this->atlanticToken();
-        $magellanToken = $this->magellanToken($atlanticToken);
-        $cookieValue = $this->endUserAPILogin($magellanToken);
-        $setup = $this->setup($cookieValue);
+        $setup = $this->fetchSetup();
 
         $this->filesystem->dumpFile('./var/files/thermorData.json', json_encode($setup, JSON_PRETTY_PRINT));
 
@@ -208,6 +218,7 @@ final readonly class ThermorService
     private function atlanticToken(): string
     {
         return $this->cache->get('atlanticToken', function (ItemInterface $item): string {
+            $this->rateLimiter->acquire();
             $ch = curl_init();
             if ($ch === false) {
                 throw new \RuntimeException('Could not initialize the Atlantic authentication request.');
@@ -244,6 +255,7 @@ final readonly class ThermorService
     private function magellanToken(string $atlanticToken): string
     {
         return $this->cache->get('magellanToken', function (ItemInterface $item) use ($atlanticToken): string {
+            $this->rateLimiter->acquire();
             $ch = curl_init();
             if ($ch === false) {
                 throw new \RuntimeException('Could not initialize the Magellan authentication request.');
@@ -266,9 +278,15 @@ final readonly class ThermorService
         });
     }
 
-    private function endUserAPILogin(string $magellanToken): string
+    private function endUserAPILogin(string $magellanToken, bool $forceFresh = false): string
     {
+        if ($forceFresh) {
+            $this->cache->delete('overkizToken');
+            $this->cache->delete('magellanToken');
+        }
+
         return $this->cache->get('overkizToken', function (ItemInterface $item) use ($magellanToken): string {
+            $this->rateLimiter->acquire();
             $ch = curl_init();
             if ($ch === false) {
                 throw new \RuntimeException('Could not initialize the Overkiz login request.');
@@ -304,13 +322,39 @@ final readonly class ThermorService
             // causes HTTP 401 on subsequent setup and command requests.
             $cookieValue = $sessionCookie;
 
-            $item->expiresAfter(60 * 15);
+            $item->expiresAfter(60 * 30);
             return $cookieValue;
         });
     }
 
-    private function setup(string $cookieValue): array
+    /**
+     * Shared by the polling and schedule-reconciliation call sites: within
+     * the cache TTL both consumers reuse a single setup call.
+     */
+    private function fetchSetup(): array
     {
+        try {
+            return $this->setup($this->endUserAPILogin($this->magellanToken($this->atlanticToken())));
+        } catch (OverkizApiException $e) {
+            if (!$e->isSessionError()) {
+                throw $e;
+            }
+            // The cached session was rejected; force a fresh one and retry once.
+            return $this->setup($this->endUserAPILogin($this->magellanToken($this->atlanticToken()), true), false);
+        }
+    }
+
+    private function setup(string $cookieValue, bool $useCache = true): array
+    {
+        if ($useCache) {
+            return $this->cache->get(self::SETUP_CACHE_KEY, function (ItemInterface $item) use ($cookieValue): array {
+                $item->expiresAfter(self::SETUP_CACHE_TTL);
+
+                return $this->setup($cookieValue, false);
+            });
+        }
+
+        $this->rateLimiter->acquire();
         $ch = curl_init();
         if ($ch === false) {
             throw new \RuntimeException('Could not initialize the Overkiz setup request.');
@@ -331,6 +375,14 @@ final readonly class ThermorService
             throw new \RuntimeException('Overkiz setup returned invalid JSON.');
         }
 
+        if (($data['errorCode'] ?? null) === 'QUOTA_EXCEEDED') {
+            $this->rateLimiter->penalize();
+
+            throw new ThermorRateLimitedException($this->rateLimiter->backoffRemainingSeconds(), 'Overkiz polling quota exceeded.');
+        }
+
+        $this->rateLimiter->recordSuccess();
+
         return $data;
     }
 
@@ -342,15 +394,28 @@ final readonly class ThermorService
         if ($response === false) {
             throw new \RuntimeException(sprintf('%s request failed: %s', $requestName, $error));
         }
+        if ($status === 429) {
+            $this->rateLimiter->penalize();
+
+            throw new ThermorRateLimitedException($this->rateLimiter->backoffRemainingSeconds(), sprintf('%s was rate limited.', $requestName));
+        }
         if ($status < 200 || $status >= 300) {
-            throw new \RuntimeException(sprintf('%s request failed with HTTP %d.', $requestName, $status));
+            throw new OverkizApiException(sprintf('%s request failed with HTTP %d.', $requestName, $status), $status, $response);
         }
 
         return $response;
     }
 
+    private function runCommands(string $cookieValue, string $deviceUrl, array $commands): void
+    {
+        foreach ($commands as $command) {
+            $this->execCommand($cookieValue, $deviceUrl, $command['name'], $command['parameters']);
+        }
+    }
+
     private function execCommand(string $cookieValue, string $deviceUrl, string $commandName, array $parameters): array
     {
+        $this->rateLimiter->acquire();
         $response = $this->httpClient->request('POST', $this->overkizEndpointCommandUrl, [
             'headers' => [
                 'Host' => 'ha110-1.overkiz.com',
@@ -373,11 +438,21 @@ final readonly class ThermorService
         ]);
 
         $status = $response->getStatusCode();
+        if ($status === 429) {
+            $this->rateLimiter->penalize();
+
+            throw new ThermorRateLimitedException($this->rateLimiter->backoffRemainingSeconds(), 'Overkiz command was rate limited.');
+        }
         if ($status < 200 || $status >= 300) {
-            throw new \RuntimeException(sprintf('Overkiz command "%s" failed with HTTP %d.', $commandName, $status));
+            throw new OverkizApiException(sprintf('Overkiz command "%s" failed with HTTP %d.', $commandName, $status), $status, $response->getContent(false));
         }
 
         $responseData = $response->toArray(false);
+        if (($responseData['errorCode'] ?? null) === 'QUOTA_EXCEEDED') {
+            $this->rateLimiter->penalize();
+
+            throw new ThermorRateLimitedException($this->rateLimiter->backoffRemainingSeconds(), 'Overkiz command quota exceeded.');
+        }
         if (!isset($responseData['execId'])) {
             throw new \RuntimeException(sprintf('Overkiz did not acknowledge command "%s".', $commandName));
         }

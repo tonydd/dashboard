@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Enum\KeyValueKey;
+use App\Exception\ThermorRateLimitedException;
 use App\Repository\KeyValueRepository;
 use App\Service\ThermorService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -36,7 +37,7 @@ class ThermorController extends AbstractController
             return $response;
         }
 
-        return $this->json($this->thermorService->setAbsenceMode(true), JsonResponse::HTTP_ACCEPTED);
+        return $this->applyAbsenceMode(fn (): array => $this->thermorService->setAbsenceMode(true));
     }
 
     #[Route('/absence-mode', methods: ['DELETE'])]
@@ -47,7 +48,20 @@ class ThermorController extends AbstractController
             return $response;
         }
 
-        return $this->json($this->thermorService->setAbsenceMode(false), JsonResponse::HTTP_ACCEPTED);
+        return $this->applyAbsenceMode(fn (): array => $this->thermorService->setAbsenceMode(false));
+    }
+
+    private function applyAbsenceMode(callable $action): JsonResponse
+    {
+        try {
+            return $this->json($action(), JsonResponse::HTTP_ACCEPTED);
+        } catch (ThermorRateLimitedException $e) {
+            return $this->json(
+                ['error' => 'The water-heater API budget is exhausted; try again later.'],
+                JsonResponse::HTTP_TOO_MANY_REQUESTS,
+                ['Retry-After' => max(1, $e->retryAfterSeconds)],
+            );
+        }
     }
 
     private function authorizeControl(Request $request): ?JsonResponse

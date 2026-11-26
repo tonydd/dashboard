@@ -2,6 +2,7 @@
 
 namespace App\Command;
 
+use App\Exception\ThermorRateLimitedException;
 use App\Service\ThermorService;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -23,7 +24,17 @@ class ThermorCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
-        $this->thermorService->update();
+        try {
+            $this->thermorService->update();
+        } catch (ThermorRateLimitedException $e) {
+            $io->warning(sprintf(
+                'Thermor API budget exhausted, retry in %d seconds.',
+                $e->retryAfterSeconds,
+            ));
+
+            return Command::FAILURE;
+        }
+
         return Command::SUCCESS;
     }
 }
