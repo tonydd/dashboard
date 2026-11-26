@@ -210,10 +210,8 @@ class CameraSignalingCommand extends Command
         $accept = base64_encode(sha1($websocketKey.self::WS_GUID, true));
         fwrite($this->clients[$key]['socket'], "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: {$accept}\r\n\r\n");
 
+        $this->clients[$key]['id'] = sprintf('viewer-%d', $key);
         $this->clients[$key]['role'] = $role;
-        if ($role === CameraTokenService::ROLE_VIEWER) {
-            $this->clients[$key]['id'] = sprintf('viewer-%d', $key);
-        }
 
         if ($role === CameraTokenService::ROLE_PUBLISHER) {
             if ($this->publisherId !== null) {
@@ -230,17 +228,29 @@ class CameraSignalingCommand extends Command
             $this->publisherId = $key;
             $this->clients[$key]['id'] = 'publisher';
             ($this->log)('Publisher registered.');
-        }
-
-        $this->sendJson($this->clients[$key]['socket'], [
-            'type' => $role === CameraTokenService::ROLE_PUBLISHER ? 'registered' : 'waiting',
-        ]);
-
-        if ($role === CameraTokenService::ROLE_VIEWER) {
+            $this->sendJson($this->clients[$key]['socket'], [
+                'type' => 'registered',
+                'viewers' => $this->connectedViewerIds(),
+            ]);
+        } else {
+            $this->sendJson($this->clients[$key]['socket'], ['type' => 'waiting']);
             $this->notifyPublisher('viewer-joined', ['viewerId' => $this->clients[$key]['id']]);
         }
 
         $this->consumeFrames($key);
+    }
+
+    /** @return string[] */
+    private function connectedViewerIds(): array
+    {
+        $ids = [];
+        foreach ($this->clients as $client) {
+            if ($client['role'] === CameraTokenService::ROLE_VIEWER) {
+                $ids[] = $client['id'];
+            }
+        }
+
+        return $ids;
     }
 
     private function rejectHandshake(int $key, string $status): void
@@ -392,7 +402,11 @@ class CameraSignalingCommand extends Command
 
         $type = (string) ($data['type'] ?? '');
         if ($client['role'] === CameraTokenService::ROLE_PUBLISHER) {
-            $this->relayFromPublisher($data, $type);
+            if ($type === 'stop') {
+                $this->broadcastToViewers('publisher-stopped');
+            } else {
+                $this->relayFromPublisher($data, $type);
+            }
 
             return;
         }

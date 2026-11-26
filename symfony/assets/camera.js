@@ -50,21 +50,21 @@ function createPeerConnection() {
 }
 
 // ---------------------------------------------------------------------------
-// Publisher side: the tablet exposes its camera to connected viewers.
+// Publisher side: the tablet registers on the signaling server as soon as the
+// page opens and shares its camera with connected viewers while ON.
 // ---------------------------------------------------------------------------
 
 function initCameraPublisher() {
   const toggle = document.querySelector('[data-camera-toggle]');
   if (!toggle) return;
 
-  const preview = document.querySelector('[data-camera-preview]');
   const label = toggle.querySelector('[data-camera-label]') ?? toggle;
   let mediaStream = null;
-  let socket = null;
   let socketState = 'off';
-  let publisherTokenExpired = false;
-  const peers = new Map();
+  let sessionExpired = false;
   let retryTimer = null;
+  // viewerId -> RTCPeerConnection, or null while waiting for the camera to be ON.
+  const viewers = new Map();
 
   const send = (payload) => {
     if (socketState === 'open') {
@@ -75,130 +75,127 @@ function initCameraPublisher() {
   const setToggleState = (state) => {
     toggle.dataset.cameraState = state;
     label.textContent = state === 'on' ? 'ON' : 'OFF';
-    if (preview) preview.hidden = state !== 'on';
   };
 
-  const onMessage = async (message) => {
-    switch (message.type) {
-      case 'registered':
-      case 'waiting':
-        publisherTokenExpired = false;
-        break;
-      case 'viewer-joined':
-        await addViewer(message.viewerId);
-        break;
-      case 'viewer-left': {
-        const peer = peers.get(message.viewerId);
-        if (peer) {
-          peer.close();
-          peers.delete(message.viewerId);
-        }
-        break;
-      }
-      case 'answer': {
-        const peer = peers.get(message.viewerId);
-        if (peer && peer.signalingState !== 'stable') {
-          await peer.setRemoteDescription({ type: 'answer', sdp: message.sdp });
-        }
-        break;
-      }
-      case 'ice': {
-        const peer = peers.get(message.viewerId);
-        if (peer) {
-          await peer.addIceCandidate(message.candidate).catch((error) => logClientFailure('Camera publisher ICE', error));
-        }
-        break;
-      }
-      case 'publisher_left':
-      case 'error':
-        break;
+  const closePeerFor = (viewerId) => {
+    const peer = viewers.get(viewerId);
+    if (peer) {
+      peer.onicecandidate = null;
+      peer.close();
+      viewers.set(viewerId, null);
     }
   };
 
-  const addViewer = async (viewerId) => {
-    if (!mediaStream || peers.has(viewerId)) return;
+  const stopSharing = () => {
+    if (!mediaStream) return;
+    mediaStream.getTracks().forEach((track) => track.stop());
+    mediaStream = null;
+    viewers.forEach((_, viewerId) => closePeerFor(viewerId));
+    send({ type: 'stop' });
+    setToggleState('off');
+  };
+
+  const createPeerAndOffer = async (viewerId) => {
+    if (!mediaStream || viewers.get(viewerId)) return;
     const peer = createPeerConnection();
+    viewers.set(viewerId, peer);
     mediaStream.getTracks().forEach((track) => peer.addTrack(track, mediaStream));
     peer.onicecandidate = (event) => {
       if (event.candidate) send({ type: 'ice', to: viewerId, candidate: event.candidate.toJSON() });
     };
     peer.onconnectionstatechange = () => {
-      if (['failed', 'closed'].includes(peer.connectionState)) {
-        peer.close();
-        peers.delete(viewerId);
+      if (['failed', 'closed', 'disconnected'].includes(peer.connectionState)) {
+        closePeerFor(viewerId);
       }
     };
-    peers.set(viewerId, peer);
     try {
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
       send({ type: 'offer', to: viewerId, sdp: offer.sdp });
     } catch (error) {
       logClientFailure('Camera publisher offer', error);
-      peer.close();
-      peers.delete(viewerId);
+      closePeerFor(viewerId);
     }
   };
 
-  const closePeers = () => {
-    peers.forEach((peer) => peer.close());
-    peers.clear();
-  };
-
-  const stopCamera = () => {
-    if (retryTimer) clearTimeout(retryTimer);
-    retryTimer = null;
-    closePeers();
-    socketState = 'closing';
-    socket?.close();
-    socket = null;
-    socketState = 'off';
-    if (mediaStream) {
-      mediaStream.getTracks().forEach((track) => track.stop());
-      mediaStream = null;
+  const onMessage = (message) => {
+    switch (message.type) {
+      case 'registered':
+        socketState = 'open';
+        (message.viewers || []).forEach((viewerId) => {
+          if (!viewers.has(viewerId)) viewers.set(viewerId, null);
+          if (mediaStream) createPeerAndOffer(viewerId);
+        });
+        break;
+      case 'viewer-joined':
+        viewers.set(message.viewerId, null);
+        if (mediaStream) createPeerAndOffer(message.viewerId);
+        break;
+      case 'viewer-left':
+        closePeerFor(message.viewerId);
+        viewers.delete(message.viewerId);
+        break;
+      case 'answer': {
+        const peer = viewers.get(message.viewerId);
+        if (peer && peer.signalingState !== 'stable') {
+          peer.setRemoteDescription({ type: 'answer', sdp: message.sdp })
+            .catch((error) => logClientFailure('Camera publisher answer', error));
+        }
+        break;
+      }
+      case 'ice': {
+        const peer = viewers.get(message.viewerId);
+        if (peer) {
+          peer.addIceCandidate(message.candidate).catch((error) => logClientFailure('Camera publisher ICE', error));
+        }
+        break;
+      }
     }
-    if (preview) preview.srcObject = null;
-    setToggleState('off');
   };
 
-  const reconnect = () => {
-    if (socketState === 'open' || socketState === 'connecting') return;
-    if (!mediaStream) return;
+  const connect = () => {
+    if (sessionExpired || socketState === 'open' || socketState === 'connecting') return;
     socketState = 'connecting';
     openCameraSocket('publisher', onMessage)
       .then((connection) => {
         socket = connection;
-        socket.onopen = () => {
-          socketState = 'open';
-        };
         socket.onclose = () => {
           socketState = 'closed';
+          // The server dropped the room state with it; the user re-enables ON if needed.
           if (mediaStream) {
-            reconnectRetry();
+            mediaStream.getTracks().forEach((track) => track.stop());
+            mediaStream = null;
+            setToggleState('off');
           }
-        };
-        socket.onerror = () => {
-          if (socketState !== 'open') socketState = 'closed';
+          viewers.clear();
+          scheduleReconnect();
         };
       })
       .catch((error) => {
+        socketState = 'closed';
         logClientFailure('Camera publisher connect', error);
         if (error instanceof Error && error.message.includes('Session expirée')) {
-          publisherTokenExpired = true;
+          window.location.replace('/tablet');
+          sessionExpired = true;
+
+          return;
         }
-        reconnectRetry();
+        scheduleReconnect();
       });
   };
 
-  const reconnectRetry = () => {
-    if (publisherTokenExpired || !mediaStream) return;
-    if (retryTimer) clearTimeout(retryTimer);
-    retryTimer = setTimeout(reconnect, CONNECTION_RETRY_DELAY_MS);
+  const scheduleReconnect = () => {
+    if (sessionExpired || retryTimer) return;
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      connect();
+    }, CONNECTION_RETRY_DELAY_MS);
   };
 
   toggle.addEventListener('click', async () => {
     if (toggle.dataset.cameraState === 'on') {
-      stopCamera();
+      stopSharing();
+
       return;
     }
 
@@ -211,20 +208,16 @@ function initCameraPublisher() {
       logClientFailure('Camera activation', error);
       label.textContent = 'KO';
       setTimeout(() => setToggleState('off'), 2000);
+
       return;
     }
 
-    if (preview) preview.srcObject = mediaStream;
     setToggleState('on');
-    reconnect();
+    connect();
+    viewers.forEach((_, viewerId) => createPeerAndOffer(viewerId));
   });
 
-  // Releasing the camera when the tablet page is hidden avoids keeping the sensor warm unused.
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden && toggle.dataset.cameraState === 'on') {
-      stopCamera();
-    }
-  });
+  connect();
 }
 
 // ---------------------------------------------------------------------------
@@ -270,7 +263,11 @@ function initCameraViewer() {
         }
         break;
       case 'publisher-left':
-        setStatus('La tablette a arrêté le partage; nouvel essai…');
+        setStatus('La tablette est déconnectée; nouvel essai…');
+        closePeer();
+        break;
+      case 'publisher-stopped':
+        setStatus('La tablette a arrêté le partage; en attente…');
         closePeer();
         break;
       case 'error':
