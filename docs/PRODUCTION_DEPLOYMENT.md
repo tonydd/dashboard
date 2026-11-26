@@ -7,19 +7,24 @@ Les services exposent uniquement des ports loopback :
 - `web` est un proxy Caddy léger vers Symfony sur `127.0.0.1:9101` par défaut.
 - `php` sert Symfony/Apache sur `127.0.0.1:9100` par défaut.
 - `scheduler` exécute `messenger:consume scheduler_default` et redémarre automatiquement.
+- `webcam-ws` exécute le serveur de signalisation caméra (`app:camera:ws`) sur `127.0.0.1:9102` par défaut ; il ne dépend pas de MySQL (jetons signés HMAC avec `APP_SECRET`).
 - `database` utilise un volume Docker persistant et n'expose aucun port à l'hôte.
 
 ## Apache hôte
 
-Activer les modules `proxy` et `proxy_http`. Dans le VirtualHost frontend, remplacer le `DocumentRoot` et les anciennes règles de fallback par ces relais :
+Activer les modules `proxy`, `proxy_http` et `proxy_wstunnel`. Dans le VirtualHost frontend, remplacer le `DocumentRoot` et les anciennes règles de fallback par ces relais :
 
 ```apache
 ProxyPreserveHost On
+ProxyPass /camera-ws ws://127.0.0.1:9102/camera-ws
+ProxyPassReverse /camera-ws ws://127.0.0.1:9102/camera-ws
 ProxyPass /api/ http://127.0.0.1:9101/api/
 ProxyPassReverse /api/ http://127.0.0.1:9101/api/
 ProxyPass / http://127.0.0.1:9101/
 ProxyPassReverse / http://127.0.0.1:9101/
 ```
+
+Le relais `/camera-ws` sert la signalisation WebSocket de la caméra (page tablette et page caméra) ; il doit être déclaré avant la règle générique `/`. En HTTPS, Apache termine le TLS et le navigateur utilise `wss://…/camera-ws` automatiquement. Laisser `CAMERA_WS_URL` vide dans le `.env` Symfony : le front déduit alors l'URL depuis le domaine visité (`ws` ou `wss` selon le schéma). Ne la renseigner que si la signalisation doit passer par un domaine ou un port distinct, par exemple `ws://{host}:8081` (`{host}` est remplacé par le nom d'hôte du navigateur).
 
 Le VirtualHost de l'API doit aussi remplacer son `DocumentRoot` et son `FallbackResource` pour relayer vers Symfony :
 
@@ -47,7 +52,7 @@ La configuration serveur de la météo et du nom de station carburant se place d
 
 `THERMOR_API_TOKEN` est facultatif : sans cette variable, la lecture de l'état du chauffe-eau reste disponible, mais les commandes de pilotage répondent `503` jusqu'à sa configuration.
 
-Pour préparer l'archive, partir de l'archive actuelle, la déchiffrer dans un dossier temporaire sous `/dev/shm`, puis y ajouter ou remplacer `.env.compose.prod`. Copier les valeurs du modèle `.env.compose.prod.example` et renseigner les identifiants MySQL et deux ports loopback libres (`9100` pour l'API et `9101` pour le frontend par défaut). `BACKGROUND_HOST_PATH` est facultatif; s'il est omis, Compose utilise `./symfony/var/backgrounds` dans le checkout de déploiement. Générer des mots de passe MySQL distincts, de préférence hexadécimaux, et ne jamais committer le fichier réel. Recréer ensuite le `tar.gz`, le chiffrer avec le même mécanisme GPG que l'archive actuelle, puis vérifier que le script `gpg --decrypt ... | tar xz` peut le lire. Ne remplacer l'archive de production qu'après cette vérification.
+Pour préparer l'archive, partir de l'archive actuelle, la déchiffrer dans un dossier temporaire sous `/dev/shm`, puis y ajouter ou remplacer `.env.compose.prod`. Copier les valeurs du modèle `.env.compose.prod.example` et renseigner les identifiants MySQL et trois ports loopback libres (`9100` pour l'API, `9101` pour le frontend et `9102` pour la signalisation caméra par défaut). `BACKGROUND_HOST_PATH` est facultatif; s'il est omis, Compose utilise `./symfony/var/backgrounds` dans le checkout de déploiement. Générer des mots de passe MySQL distincts, de préférence hexadécimaux, et ne jamais committer le fichier réel. Recréer ensuite le `tar.gz`, le chiffrer avec le même mécanisme GPG que l'archive actuelle, puis vérifier que le script `gpg --decrypt ... | tar xz` peut le lire. Ne remplacer l'archive de production qu'après cette vérification.
 
 Le backend utilise toujours `BACKGROUND_PATH` pour servir le fond d'écran quotidien via `/api/background`. Si aucun fichier `.jpg` n'est présent dans le dossier monté, le déploiement ne bloque plus, mais cette route ne pourra pas fournir d'image.
 
@@ -65,7 +70,14 @@ Prévoir des sauvegardes régulières du volume de production. Les migrations so
 
 ## Déploiement et exploitation
 
-Remplacer l'ancien script de déploiement par `scripts/deploy-prod.sh`. Il clone le dépôt, déchiffre les secrets en RAM, construit et démarre les services, importe le dump uniquement au premier démarrage et applique les migrations. Le service Docker `scheduler` remplace l'ancien worker Supervisor. Pour les déploiements suivants, l'archive peut omettre `database.sql.gz`.
+Remplacer l'ancien script de déploiement par `scripts/deploy-prod.sh`. Il clone le dépôt, déchiffre les secrets en RAM, construit et démarre les services, importe le dump uniquement au premier démarrage et applique les migrations. La branche à déployer se passe en premier argument (défaut `main`) :
+
+```sh
+scripts/deploy-prod.sh            # branche main
+scripts/deploy-prod.sh revamp-front
+```
+
+Le service Docker `scheduler` remplace l'ancien worker Supervisor. Pour les déploiements suivants, l'archive peut omettre `database.sql.gz`.
 
 Après avoir vérifié que le worker Docker `dashboard-prod-scheduler-1` fonctionne, désactiver l'ancien worker Supervisor. Si aucun autre programme n'est géré par Supervisor :
 

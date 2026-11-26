@@ -81,6 +81,9 @@ services:
       - ${SYMFONY_ENV_FILE:?Set SYMFONY_ENV_FILE to the decrypted Symfony env file}
     command: ["php", "bin/console", "app:camera:ws", "--host=0.0.0.0", "--port=8080"]
     environment: *app_environment
+    ports:
+      # Loopback only; the host Apache reverse-proxies /camera-ws (mod_proxy_wstunnel) to it.
+      - "127.0.0.1:${CAM_WS_BIND_PORT:-9102}:8080"
 
   web:
     build:
