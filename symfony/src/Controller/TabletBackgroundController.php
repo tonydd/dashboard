@@ -39,7 +39,7 @@ class TabletBackgroundController extends AbstractController
 
     #[Route('/tablet-background', name: 'tablet_background_save', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
-    #[IsCsrfTokenValid('tablet_background')]
+    #[IsCsrfTokenValid('tablet_background', tokenKey: '_csrf_token')]
     public function save(Request $request): Response
     {
         if ($request->request->get('action') === 'clear') {
