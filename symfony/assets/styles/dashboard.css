@@ -484,7 +484,7 @@ dialog::backdrop {
 
 .camera-page {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   width: 100vw;
   min-height: 100vh;
   padding: 0;
@@ -517,3 +517,49 @@ dialog::backdrop {
   object-fit: contain;
   background: #000;
 }
+
+.camera-list-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px;
+  background: var(--panel);
+}
+
+.camera-list-title {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.camera-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.camera-list button {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.camera-list button.is-selected {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.camera-list button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+

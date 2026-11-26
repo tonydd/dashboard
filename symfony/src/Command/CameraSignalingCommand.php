@@ -12,36 +12,43 @@ use Symfony\Component\Console\Output\OutputInterface;
 /**
  * Minimal RFC 6455 WebSocket server dedicated to camera signaling.
  *
- * Media flows peer-to-peer (WebRTC) between the tablet and the viewer devices:
- * the only purpose of this server is to relay session descriptions and ICE
- * candidates between the single camera publisher and its viewers, so a
- * dependency-free implementation is enough here.
+ * Media flows peer-to-peer (WebRTC) between the camera publishers (tablets)
+ * and the viewer devices; the only purpose of this server is to relay session
+ * descriptions and ICE candidates, so a dependency-free implementation is
+ * enough here. Several publishers may register at the same time; each one
+ * picks a display name and reports whether its camera is currently ON, which
+ * is what viewers poll (healthcheck) to keep their camera list fresh.
  *
  * Protocol (JSON text frames):
- *   - server → publisher: {registered} {viewer-joined,viewerId} {viewer-left,viewerId}
- *   - server → viewer:    {waiting} {offer,sdp} {ice,candidate} {publisher-left}
- *   - publisher → server: {offer,to,sdp} {ice,to,candidate}
- *   - viewer → server:    {answer,sdp} {ice,candidate}
+ *   - publisher → server: {status,cameraOn} {offer,to,sdp} {ice,to,candidate}
+ *   - viewer → server:    {watch,to} {cameras} {answer,sdp} {ice,candidate}
+ *   - server → publisher: {registered,id,viewers} {viewer-joined,viewerId} {viewer-left,viewerId} {evicted}
+ *   - server → viewer:    {cameras,list:[{id,name,cameraOn}]} {offer,sdp} {ice,candidate} {publisher-left} {publisher-stopped}
  */
 #[AsCommand(
     name: 'app:camera:ws',
-    description: 'Runs the camera signaling WebSocket server (one tablet publisher, many viewers).',
+    description: 'Runs the camera signaling WebSocket server (many named camera publishers, many viewers).',
 )]
 class CameraSignalingCommand extends Command
 {
     private const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
     private const MAX_TOTAL_BUFFER_BYTES = 131072;
     private const MAX_SIGNALING_MESSAGE_BYTES = 32768;
+    private const MAX_CLIENT_NAME_LENGTH = 60;
     private const STALE_SECONDS = 120;
     private const PING_INTERVAL_SECONDS = 30;
     private const CLOSE_INVALID_TOKEN = 4001;
     private const CLOSE_EVICTED = 4002;
 
     /**
-     * @var array<int, array{socket: resource, id: string, role: string, buffer: string, fragment: string, lastSeen: int}>
+     * Publishers carry a display name and the current camera state; viewers
+     * remember which publisher they watch so relaying stays unambiguous.
+     *
+     * @var array<int, array{socket: resource, id: string, role: string, buffer: string, fragment: string, lastSeen: int, name: string, cameraOn: bool, watched: int|null}>
      */
     private array $clients = [];
-    private ?int $publisherId = null;
+    private int $nextCameraId = 0;
+    private int $nextViewerId = 0;
     /** @var resource|null */
     private $server;
     private int $lastPingAt = 0;
@@ -139,6 +146,9 @@ class CameraSignalingCommand extends Command
             'buffer' => '',
             'fragment' => '',
             'lastSeen' => time(),
+            'name' => '',
+            'cameraOn' => false,
+            'watched' => null,
         ];
     }
 
@@ -210,47 +220,102 @@ class CameraSignalingCommand extends Command
         $accept = base64_encode(sha1($websocketKey.self::WS_GUID, true));
         fwrite($this->clients[$key]['socket'], "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: {$accept}\r\n\r\n");
 
-        $this->clients[$key]['id'] = sprintf('viewer-%d', $key);
-        $this->clients[$key]['role'] = $role;
-
         if ($role === CameraTokenService::ROLE_PUBLISHER) {
-            if ($this->publisherId !== null) {
-                // A followed-up register means the previous publisher died (page reload);
-                // evict it instead of leaving the room locked until the stale timeout.
-                ($this->log)('Evicting previous publisher.');
-                $previous = $this->publisherId;
-                $this->publisherId = null;
-                if (isset($this->clients[$previous])) {
-                    $this->sendJson($this->clients[$previous]['socket'], ['type' => 'evicted']);
-                    $this->closeConnection($previous, true, self::CLOSE_EVICTED, false);
-                }
-            }
-            $this->publisherId = $key;
-            $this->clients[$key]['id'] = 'publisher';
-            ($this->log)('Publisher registered.');
-            $this->sendJson($this->clients[$key]['socket'], [
-                'type' => 'registered',
-                'viewers' => $this->connectedViewerIds(),
-            ]);
+            $this->registerPublisher($key, (string) ($queryValues['name'] ?? ''));
         } else {
-            $this->sendJson($this->clients[$key]['socket'], ['type' => 'waiting']);
-            $this->notifyPublisher('viewer-joined', ['viewerId' => $this->clients[$key]['id']]);
+            $this->clients[$key]['role'] = CameraTokenService::ROLE_VIEWER;
+            $this->clients[$key]['id'] = sprintf('viewer-%d', ++$this->nextViewerId);
+            // Initial camera list; viewers then poll it every few seconds (healthcheck).
+            $this->sendJson($this->clients[$key]['socket'], $this->camerasMessage());
         }
 
         $this->consumeFrames($key);
     }
 
+    private function registerPublisher(int $key, string $rawName): void
+    {
+        $name = trim(preg_replace('/[[:cntrl:]]/u', '', $rawName) ?? '');
+        if (mb_strlen($name) > self::MAX_CLIENT_NAME_LENGTH) {
+            $name = mb_substr($name, 0, self::MAX_CLIENT_NAME_LENGTH);
+        }
+
+        // A page reload reconnects under the same name: evict the publisher
+        // session it replaces instead of letting a half-open socket linger on.
+        foreach ($this->clients as $otherKey => $other) {
+            if ($otherKey !== $key && $other['role'] === CameraTokenService::ROLE_PUBLISHER && $other['name'] === $name) {
+                ($this->log)(sprintf('Evicting previous publisher "%s".', $name));
+                $this->sendJson($other['socket'], ['type' => 'evicted']);
+                $this->closeConnection($otherKey, true, self::CLOSE_EVICTED, false);
+
+                // Viewers watching the evicted session follow the new one.
+                foreach ($this->clients as $viewerKey => $viewer) {
+                    if ($viewer['role'] === CameraTokenService::ROLE_VIEWER && $viewer['watched'] === $otherKey) {
+                        $this->clients[$viewerKey]['watched'] = $key;
+                    }
+                }
+            }
+        }
+
+        $this->clients[$key]['role'] = CameraTokenService::ROLE_PUBLISHER;
+        $this->clients[$key]['id'] = sprintf('camera-%d', ++$this->nextCameraId);
+        $this->clients[$key]['name'] = $name !== '' ? $name : $this->clients[$key]['id'];
+        ($this->log)(sprintf('Publisher "%s" registered as %s.', $this->clients[$key]['name'], $this->clients[$key]['id']));
+        $this->sendJson($this->clients[$key]['socket'], [
+            'type' => 'registered',
+            'id' => $this->clients[$key]['id'],
+            'viewers' => $this->watcherIds($key),
+        ]);
+        $this->broadcastCameras();
+    }
+
     /** @return string[] */
-    private function connectedViewerIds(): array
+    private function watcherIds(int $publisherKey): array
     {
         $ids = [];
         foreach ($this->clients as $client) {
-            if ($client['role'] === CameraTokenService::ROLE_VIEWER) {
+            if ($client['role'] === CameraTokenService::ROLE_VIEWER && $client['watched'] === $publisherKey) {
                 $ids[] = $client['id'];
             }
         }
 
         return $ids;
+    }
+
+    /**
+     * The healthcheck payload viewers rely on: only connections still open
+     * with their camera reportedly ON are flagged as usable.
+     *
+     * @return array<int, array{id: string, name: string, cameraOn: bool}>
+     */
+    private function cameraList(): array
+    {
+        $list = [];
+        foreach ($this->clients as $client) {
+            if ($client['role'] === CameraTokenService::ROLE_PUBLISHER) {
+                $list[] = [
+                    'id' => $client['id'],
+                    'name' => $client['name'],
+                    'cameraOn' => $client['cameraOn'],
+                ];
+            }
+        }
+
+        return $list;
+    }
+
+    private function camerasMessage(): array
+    {
+        return ['type' => 'cameras', 'list' => $this->cameraList()];
+    }
+
+    private function broadcastCameras(): void
+    {
+        $message = $this->camerasMessage();
+        foreach ($this->clients as $client) {
+            if ($client['role'] === CameraTokenService::ROLE_VIEWER) {
+                $this->sendJson($client['socket'], $message);
+            }
+        }
     }
 
     private function rejectHandshake(int $key, string $status): void
@@ -403,20 +468,81 @@ class CameraSignalingCommand extends Command
         $type = (string) ($data['type'] ?? '');
         if ($client['role'] === CameraTokenService::ROLE_PUBLISHER) {
             if ($type === 'stop') {
-                $this->broadcastToViewers('publisher-stopped');
+                $this->updatePublisherStatus($key, false);
+            } elseif ($type === 'status' && is_bool($data['cameraOn'] ?? null)) {
+                $this->updatePublisherStatus($key, $data['cameraOn']);
             } else {
-                $this->relayFromPublisher($data, $type);
+                $this->relayFromPublisher($key, $data, $type);
             }
 
             return;
         }
 
         if ($client['role'] === CameraTokenService::ROLE_VIEWER) {
-            $this->relayFromViewer($client, $data, $type);
+            $this->handleViewerMessage($key, $client, $data, $type);
         }
     }
 
-    private function relayFromPublisher(array $data, string $type): void
+    private function updatePublisherStatus(int $key, bool $cameraOn): void
+    {
+        if (($this->clients[$key]['cameraOn'] ?? null) === $cameraOn) {
+            return;
+        }
+        $this->clients[$key]['cameraOn'] = $cameraOn;
+        ($this->log)(sprintf('Publisher "%s" camera is %s.', $this->clients[$key]['name'], $cameraOn ? 'ON' : 'OFF'));
+
+        if ($cameraOn) {
+            // Viewers bound to this publisher get handed back to it so it can
+            // renegotiate as soon as the camera comes back.
+            foreach ($this->clients as $client) {
+                if ($client['role'] === CameraTokenService::ROLE_VIEWER && $client['watched'] === $key) {
+                    $this->sendJson($this->clients[$key]['socket'], ['type' => 'viewer-joined', 'viewerId' => $client['id']]);
+                }
+            }
+        } else {
+            foreach ($this->clients as $client) {
+                if ($client['role'] === CameraTokenService::ROLE_VIEWER && $client['watched'] === $key) {
+                    $this->sendJson($client['socket'], ['type' => 'publisher-stopped']);
+                }
+            }
+        }
+        $this->broadcastCameras();
+    }
+
+    private function handleViewerMessage(int $key, array $client, array $data, string $type): void
+    {
+        if ($type === 'cameras') {
+            $this->sendJson($client['socket'], $this->camerasMessage());
+
+            return;
+        }
+
+        if ($type === 'watch') {
+            $targetId = (string) ($data['to'] ?? '');
+            foreach ($this->clients as $publisherKey => $publisher) {
+                if ($publisher['role'] !== CameraTokenService::ROLE_PUBLISHER || $publisher['id'] !== $targetId) {
+                    continue;
+                }
+                if ($client['watched'] === $publisherKey) {
+                    return; // already watching this camera, nothing to do
+                }
+                if ($client['watched'] !== null && isset($this->clients[$client['watched']])) {
+                    $previous = $this->clients[$client['watched']];
+                    $this->sendJson($previous['socket'], ['type' => 'viewer-left', 'viewerId' => $client['id']]);
+                }
+                $this->clients[$key]['watched'] = $publisherKey;
+                $this->sendJson($publisher['socket'], ['type' => 'viewer-joined', 'viewerId' => $client['id']]);
+
+                return;
+            }
+
+            return;
+        }
+
+        $this->relayFromViewer($client, $data, $type);
+    }
+
+    private function relayFromPublisher(int $publisherKey, array $data, string $type): void
     {
         $viewerId = (string) ($data['to'] ?? '');
         if ($viewerId === '') {
@@ -437,7 +563,10 @@ class CameraSignalingCommand extends Command
         }
 
         foreach ($this->clients as $client) {
-            if ($client['role'] === CameraTokenService::ROLE_VIEWER && $client['id'] === $viewerId) {
+            if ($client['role'] === CameraTokenService::ROLE_VIEWER
+                && $client['id'] === $viewerId
+                && $client['watched'] === $publisherKey
+            ) {
                 $this->sendJson($client['socket'], $payload);
 
                 return;
@@ -447,30 +576,18 @@ class CameraSignalingCommand extends Command
 
     private function relayFromViewer(array $viewer, array $data, string $type): void
     {
+        $publisherKey = $viewer['watched'];
+        if ($publisherKey === null || !isset($this->clients[$publisherKey])) {
+            return;
+        }
+
         $payload = ['viewerId' => $viewer['id']];
         match ($type) {
             'answer' => $payload['sdp'] = $data['sdp'],
             'ice' => $payload['candidate'] = $data['candidate'],
             default => null,
         };
-        $this->notifyPublisher($type === 'ice' ? 'ice' : 'answer', $payload);
-    }
-
-    private function notifyPublisher(string $type, array $payload): void
-    {
-        if ($this->publisherId === null || !isset($this->clients[$this->publisherId])) {
-            return;
-        }
-        $this->sendJson($this->clients[$this->publisherId]['socket'], ['type' => $type] + $payload);
-    }
-
-    private function broadcastToViewers(string $type): void
-    {
-        foreach ($this->clients as $client) {
-            if ($client['role'] === CameraTokenService::ROLE_VIEWER) {
-                $this->sendJson($client['socket'], ['type' => $type]);
-            }
-        }
+        $this->sendJson($this->clients[$publisherKey]['socket'], ['type' => $type === 'ice' ? 'ice' : 'answer'] + $payload);
     }
 
     private function sendJson($socket, array $payload): void
@@ -507,19 +624,24 @@ class CameraSignalingCommand extends Command
 
         $client = $this->clients[$key];
         if ($client['role'] === CameraTokenService::ROLE_PUBLISHER) {
-            if ($this->publisherId === $key) {
-                $this->publisherId = null;
-            }
             if ($withCloseFrame && $announce) {
-                ($this->log)('Publisher left; notifying viewers.');
+                ($this->log)(sprintf('Publisher "%s" left; notifying viewers.', $client['name']));
             }
             if ($announce) {
-                $this->broadcastToViewers('publisher-left');
+                foreach ($this->clients as $other) {
+                    if ($other['role'] === CameraTokenService::ROLE_VIEWER && $other['watched'] === $key) {
+                        $this->sendJson($other['socket'], ['type' => 'publisher-left']);
+                    }
+                }
+                $this->broadcastCameras();
             }
         }
 
         if ($client['role'] === CameraTokenService::ROLE_VIEWER) {
-            $this->notifyPublisher('viewer-left', ['viewerId' => $client['id']]);
+            $publisherKey = $client['watched'];
+            if ($publisherKey !== null && isset($this->clients[$publisherKey])) {
+                $this->sendJson($this->clients[$publisherKey]['socket'], ['type' => 'viewer-left', 'viewerId' => $client['id']]);
+            }
         }
 
         if ($withCloseFrame && $client['role'] !== '') {

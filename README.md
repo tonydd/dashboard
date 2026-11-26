@@ -32,11 +32,13 @@ docker compose exec php sh -c 'cd /var/www/html && php bin/console app:dashboard
 
 L'écran tablette expose sa caméra WebRTC via un serveur de signalisation WebSocket dédié :
 
-1. `Caméra` sur `/tablet` demande l'accès caméra (`getUserMedia`, sans audio) puis ouvre la connexion de signalisation ; un aperçu local s'affiche tant que le bouton est `ON`.
-2. La page `/camera`, protégée par le même mot de passe, affiche le flux depuis n'importe quel appareil connecté.
+1. `Caméra` sur `/tablet` demande l'accès caméra (`getUserMedia`, sans audio) au chargement de la page puis ouvre la connexion de signalisation.
+2. La page `/camera`, protégée par le même mot de passe, liste les caméras enregistrées (healthcheck toutes les 5 s ; seules les caméras réellement connectées avec le partage `ON` sont sélectionnables) et affiche le flux de celle qu'on choisit, depuis n'importe quel appareil connecté.
 3. Le serveur de signalisation (`php bin/console app:camera:ws`, service Docker `webcam-ws`) relaie uniquement les offres/réponses SDP et les candidats ICE ; le flux vidéo circule en peer-to-peer, chiffré par WebRTC.
 
-Authentification WebSocket : `/api/camera/token` (session + CSRF, rôle `ROLE_VIEWER`) délivre un jeton HMAC courte durée qui autorise une connexion de signalisation en tant que `publisher` (tablette) ou `viewer` (page caméra). Une seule tablette peut publier à la fois.
+Plusieurs tablettes peuvent publier simultanément : chacune porte un nom (persisté, dérivé d'un identifiant aléatoire, ou forcé via `/tablet?name=Cuisine`) qu'un rechargement de page réutilise pour remplacer sa propre session précédente.
+
+Authentification WebSocket : `/api/camera/token` (session + CSRF, rôle `ROLE_VIEWER`) délivre un jeton HMAC courte durée qui autorise une connexion de signalisation en tant que `publisher` (tablette) ou `viewer` (page caméra). Plusieurs publishers peuvent être connectés en même temps.
 
 Développement : le service `webcam-ws` écoute sur le port hôte 8081 et l'URL injectée par défaut dans les pages est `ws://{host}:8081` (`{host}` est remplacé par le nom d'hôte courant, ce qui fonctionne aussi depuis un autre appareil du réseau). En production, la route `/camera-ws` est routée par Caddy vers ce service ; le reverse proxy externe doit donc transmettre l'upgrade WebSocket (`Upgrade`/`Connection`) sans tampon de réponse pour ce chemin.
 - Le mot de passe est demandé de façon interactive et son hash est conservé en base ; aucun mot de passe n'est configuré dans le front.

@@ -3,6 +3,7 @@ const ICE_SERVERS = [
 ];
 
 const CONNECTION_RETRY_DELAY_MS = 3000;
+const HEALTHCHECK_INTERVAL_MS = 5000;
 
 const logClientFailure = (action, error) => {
   console.warn(`${action} failed`, error && error.name ? error.name : 'Error');
@@ -33,9 +34,10 @@ async function cameraWebSocketToken(role) {
   return response.json();
 }
 
-async function openCameraSocket(role, onMessage) {
+async function openCameraSocket(role, onMessage, extraParams = {}) {
   const { token } = await cameraWebSocketToken(role);
-  const socket = new WebSocket(`${cameraSocketUrl()}?token=${encodeURIComponent(token)}`);
+  const params = new URLSearchParams({ token, ...extraParams });
+  const socket = new WebSocket(`${cameraSocketUrl()}?${params}`);
   socket.onmessage = (event) => {
     try {
       onMessage(JSON.parse(event.data));
@@ -50,9 +52,29 @@ function createPeerConnection() {
   return new RTCPeerConnection({ iceServers: ICE_SERVERS });
 }
 
+/**
+ * Display name of this camera client, persisted so a page reload evicts its
+ * own previous session instead of piling up duplicate entries. `/tablet?name=
+ * Cuisine` renames the device.
+ */
+function cameraClientName() {
+  const requested = new URLSearchParams(window.location.search).get('name');
+  if (requested) {
+    localStorage.setItem('camera-client-name', requested.trim());
+
+    return requested.trim();
+  }
+  const stored = localStorage.getItem('camera-client-name');
+  if (stored) return stored;
+  const generated = `Tablette-${Math.random().toString(36).slice(2, 6)}`;
+  localStorage.setItem('camera-client-name', generated);
+
+  return generated;
+}
+
 // ---------------------------------------------------------------------------
 // Publisher side: the tablet registers on the signaling server as soon as the
-// page opens and shares its camera with connected viewers while ON.
+// page opens and shares its camera with viewers that ask to watch it.
 // ---------------------------------------------------------------------------
 
 function initCameraPublisher() {
@@ -60,6 +82,9 @@ function initCameraPublisher() {
   if (!toggle) return;
 
   const label = toggle.querySelector('[data-camera-label]') ?? toggle;
+  // Without a strong reference the browser may garbage-collect the socket and
+  // silently drop the signaling connection seconds after registering.
+  let socket = null;
   let mediaStream = null;
   let socketState = 'off';
   let sessionExpired = false;
@@ -68,9 +93,13 @@ function initCameraPublisher() {
   const viewers = new Map();
 
   const send = (payload) => {
-    if (socketState === 'open') {
+    if (socket && socketState === 'open') {
       socket.send(JSON.stringify(payload));
     }
+  };
+
+  const sendStatus = () => {
+    send({ type: 'status', cameraOn: mediaStream !== null });
   };
 
   const setToggleState = (state) => {
@@ -92,8 +121,8 @@ function initCameraPublisher() {
     mediaStream.getTracks().forEach((track) => track.stop());
     mediaStream = null;
     viewers.forEach((_, viewerId) => closePeerFor(viewerId));
-    send({ type: 'stop' });
     setToggleState('off');
+    sendStatus();
   };
 
   const createPeerAndOffer = async (viewerId) => {
@@ -123,14 +152,27 @@ function initCameraPublisher() {
     switch (message.type) {
       case 'registered':
         socketState = 'open';
+        // Re-announce the camera state; the server hands back any viewer
+        // still bound to us (signaling server restart or page reload).
+        sendStatus();
         (message.viewers || []).forEach((viewerId) => {
           if (!viewers.has(viewerId)) viewers.set(viewerId, null);
           if (mediaStream) createPeerAndOffer(viewerId);
         });
         break;
-      case 'evicted':
-        // Another tablet page took the room; stop the fight and wait for a reload.
+      case 'evicted': {
+        // Another page registered under the same name; stop sharing and let
+        // the new page own the camera without fighting over reconnects.
         sessionExpired = true;
+        if (mediaStream) {
+          mediaStream.getTracks().forEach((track) => track.stop());
+          mediaStream = null;
+        }
+        viewers.forEach((_, viewerId) => closePeerFor(viewerId));
+        viewers.clear();
+        setToggleState('off');
+        break;
+      }
       case 'viewer-joined':
         viewers.set(message.viewerId, null);
         if (mediaStream) createPeerAndOffer(message.viewerId);
@@ -160,12 +202,12 @@ function initCameraPublisher() {
   const connect = () => {
     if (sessionExpired || socketState === 'open' || socketState === 'connecting') return;
     socketState = 'connecting';
-    openCameraSocket('publisher', onMessage)
+    openCameraSocket('publisher', onMessage, { name: cameraClientName() })
       .then((connection) => {
         socket = connection;
         socket.onclose = () => {
           socketState = 'closed';
-          // The server dropped the room state with it; the user re-enables ON if needed.
+          // The server dropped our registration with it; the user re-enables ON if needed.
           if (mediaStream) {
             mediaStream.getTracks().forEach((track) => track.stop());
             mediaStream = null;
@@ -218,6 +260,7 @@ function initCameraPublisher() {
 
     setToggleState('on');
     connect();
+    sendStatus();
     viewers.forEach((_, viewerId) => createPeerAndOffer(viewerId));
   });
 
@@ -227,11 +270,12 @@ function initCameraPublisher() {
 }
 
 // ---------------------------------------------------------------------------
-// Viewer side: watch the tablet camera from another device.
+// Viewer side: watch one of the registered cameras from another device.
 // ---------------------------------------------------------------------------
 
 function initCameraViewer() {
   const video = document.querySelector('[data-camera-viewer]');
+  const listEl = document.querySelector('[data-camera-list]');
   if (!video) return;
 
   const status = document.querySelector('[data-camera-status]');
@@ -240,6 +284,8 @@ function initCameraViewer() {
   let peer = null;
   let retryTimer = null;
   let stopped = false;
+  let selectedId = null;
+  let selectedName = '';
 
   const setStatus = (text) => {
     if (status) status.textContent = text;
@@ -253,14 +299,73 @@ function initCameraViewer() {
     video.srcObject = null;
   };
 
+  const watchCamera = (camera) => {
+    if (socketState !== 'open') return;
+    selectedId = camera.id;
+    selectedName = camera.name;
+    closePeer();
+    socket.send(JSON.stringify({ type: 'watch', to: camera.id }));
+    setStatus(`Connexion à ${camera.name}…`);
+  };
+
+  const renderCameras = (cameras) => {
+    if (!listEl) return;
+    listEl.textContent = '';
+    cameras.forEach((camera) => {
+      const item = document.createElement('li');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.classList.toggle('is-selected', camera.id === selectedId);
+      button.disabled = !camera.cameraOn;
+      button.title = camera.cameraOn
+        ? `Voir le flux de ${camera.name}`
+        : `${camera.name} : caméra inactive ou déconnectée`;
+      button.textContent = camera.cameraOn ? `${camera.name} ●` : `${camera.name} ○`;
+      button.addEventListener('click', () => watchCamera(camera));
+      item.appendChild(button);
+      listEl.appendChild(item);
+    });
+  };
+
   const onMessage = async (message) => {
     switch (message.type) {
-      case 'waiting':
-        setStatus('En attente de la tablette…');
-        closePeer();
+      case 'cameras': {
+        const cameras = message.list || [];
+        renderCameras(cameras);
+
+        // A camera vanished (server restart, disconnect): give up on it.
+        if (selectedId !== null && !cameras.some((camera) => camera.id === selectedId)) {
+          closePeer();
+          setStatus(`${selectedName} est déconnectée; nouvel essai dès son retour…`);
+          selectedId = null;
+          selectedName = '';
+        }
+
+        const active = cameras.filter((camera) => camera.cameraOn);
+        if (cameras.length === 0) {
+          setStatus('Aucune caméra enregistrée.');
+          break;
+        }
+        if (active.length === 0) {
+          setStatus('Aucune caméra active.');
+          break;
+        }
+
+        // Re-attach automatically (after a signaling restart the selection
+        // survives but the binding does not; the healthcheck re-establishes it).
+        if (selectedId === null && active.length > 0) {
+          setStatus(`${active.length} caméra(s) disponible(s) — cliquez sur une caméra.`);
+          break;
+        }
+
+        const current = cameras.find((camera) => camera.id === selectedId);
+        if (current && current.cameraOn && !peer) {
+          watchCamera(current);
+        }
         break;
+      }
       case 'offer':
-        setStatus('Connexion à la caméra…');
+        setStatus(`Connexion à ${selectedName}…`);
         await acceptOffer(message.sdp);
         break;
       case 'ice':
@@ -269,11 +374,12 @@ function initCameraViewer() {
         }
         break;
       case 'publisher-left':
-        setStatus('La tablette est déconnectée; nouvel essai…');
+        // The healthcheck re-watches as soon as the camera registers again.
+        setStatus(`${selectedName} est déconnectée; nouvel essai dès son retour…`);
         closePeer();
         break;
       case 'publisher-stopped':
-        setStatus('La tablette a arrêté le partage; en attente…');
+        setStatus(`${selectedName} a arrêté le partage; en attente…`);
         closePeer();
         break;
       case 'error':
@@ -290,6 +396,12 @@ function initCameraViewer() {
         video.srcObject = event.streams[0];
         video.play().catch((error) => logClientFailure('Camera viewer play', error));
         setStatus('');
+      }
+    };
+    peer.onconnectionstatechange = () => {
+      // Dropping the dead peer lets the healthcheck re-watch the camera.
+      if (peer && ['failed', 'disconnected', 'closed'].includes(peer.connectionState)) {
+        closePeer();
       }
     };
     peer.onicecandidate = (event) => {
@@ -319,7 +431,7 @@ function initCameraViewer() {
         socket = connection;
         socket.onopen = () => {
           socketState = 'open';
-          setStatus('En attente de la tablette…');
+          setStatus('Recherche des caméras…');
         };
         socket.onclose = () => {
           socketState = 'closed';
@@ -342,6 +454,15 @@ function initCameraViewer() {
         retryTimer = setTimeout(connect, CONNECTION_RETRY_DELAY_MS);
       });
   };
+
+  // Healthcheck: poll the registered cameras every 5 seconds. The server only
+  // reports connections that are still open on its side with their camera ON,
+  // so the list tracks what is actually usable.
+  setInterval(() => {
+    if (!stopped && socketState === 'open') {
+      socket.send(JSON.stringify({ type: 'cameras' }));
+    }
+  }, HEALTHCHECK_INTERVAL_MS);
 
   connect();
   window.addEventListener('beforeunload', disconnect);
