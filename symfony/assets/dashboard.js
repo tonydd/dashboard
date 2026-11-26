@@ -77,8 +77,13 @@ slideshowImage?.addEventListener('error', () => {
 
 const loginForm = document.querySelector('#dashboard-login');
 if (loginForm) {
+  const usernameInput = document.querySelector('#username');
+  const rememberedUsername = localStorage.getItem('dashboard:username');
+  if (rememberedUsername) usernameInput.value = rememberedUsername;
   loginForm.addEventListener('submit', async (event) => {
     event.preventDefault();
+    const username = usernameInput.value.trim() || 'tablet';
+    localStorage.setItem('dashboard:username', username);
     const password = document.querySelector('#password').value;
     const error = document.querySelector('#login-error');
     error.textContent = '';
@@ -87,9 +92,9 @@ if (loginForm) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ username: 'tablet', password }),
+        body: JSON.stringify({ username, password }),
       });
-      if (response.status === 401) throw new Error('Mot de passe incorrect.');
+      if (response.status === 401) throw new Error('Identifiant ou mot de passe incorrect.');
       if (!response.ok) throw new Error('Impossible de se connecter au serveur.');
       const sessionResponse = await fetch('/api/session', {
         credentials: 'include',
