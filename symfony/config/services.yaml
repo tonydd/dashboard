@@ -74,6 +74,7 @@ services:
             $openWeatherUnits: '%openWeatherUnits%'
             $openWeatherLang: '%openWeatherLang%'
             $fuelStationName: '%fuelStationName%'
+            $appSecret: '%env(APP_SECRET)%'
 
     # Automatically injects dependencies in your services.
     # Inject parameters as env variables

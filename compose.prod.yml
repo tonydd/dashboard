@@ -69,6 +69,19 @@ services:
       database:
         condition: service_healthy
 
+  webcam-ws:
+    build:
+      context: .
+      dockerfile: Docker/php/Dockerfile.prod
+    restart: unless-stopped
+    init: true
+    user: www-data
+    working_dir: /var/www/html
+    env_file:
+      - ${SYMFONY_ENV_FILE:?Set SYMFONY_ENV_FILE to the decrypted Symfony env file}
+    command: ["php", "bin/console", "app:camera:ws", "--host=0.0.0.0", "--port=8080"]
+    environment: *app_environment
+
   web:
     build:
       context: .

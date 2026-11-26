@@ -16,7 +16,12 @@
         <strong data-timer-value="00:00:00">00:00:00</strong>
       </button>
     {% endfor %}
+    <button class="timer camera-toggle" type="button" data-camera-toggle data-camera-state="off">
+      <span class="timer-name">Caméra</span>
+      <strong data-camera-label>OFF</strong>
+    </button>
   </section>
+  <video data-camera-preview class="camera-preview" autoplay playsinline muted hidden></video>
 
   <button
     class="weather widget"

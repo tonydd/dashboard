@@ -17,6 +17,28 @@ final class DashboardControllerTest extends WebTestCase
         $client->request('GET', '/slideshow');
         self::assertResponseIsSuccessful();
         self::assertSelectorExists('#dashboard-login');
+
+        $client->request('GET', '/camera');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('#dashboard-login');
+    }
+
+    public function testCameraTokenRequiresAnAuthenticatedSession(): void
+    {
+        $client = static::createClient();
+
+        $client->request('POST', '/api/camera/token', server: ['CONTENT_TYPE' => 'application/json'], content: '{"role":"viewer"}');
+
+        self::assertResponseStatusCodeSame(401);
+    }
+
+    public function testCameraTokenRefusesUnsupportedRolesForAnonymousUsersToo(): void
+    {
+        $client = static::createClient();
+
+        $client->request('POST', '/api/camera/token', server: ['CONTENT_TYPE' => 'application/json'], content: '{"role":"admin"}');
+
+        self::assertResponseStatusCodeSame(401);
     }
 
     public function testDeprecatedDashboardRoutesAreNotRegistered(): void

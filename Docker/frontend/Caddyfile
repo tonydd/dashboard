@@ -4,5 +4,13 @@
 
 :80 {
 	encode zstd gzip
-	reverse_proxy php:80
+
+	# Camera signaling runs in its own container; WebSocket upgrades are proxied as-is.
+	handle /camera-ws* {
+		reverse_proxy webcam-ws:8080
+	}
+
+	handle {
+		reverse_proxy php:80
+	}
 }
