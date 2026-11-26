@@ -82,9 +82,13 @@ function cameraClientName() {
 
 function initCameraPublisher() {
   const toggle = document.querySelector('[data-camera-toggle]');
-  if (!toggle) return;
+  // Headless publisher: the slideshow page re-registers the camera so the
+  // sharing survives the tablet -> slideshow page switch; going back to
+  // /tablet re-registers under the same name and evicts this session.
+  const headless = Boolean(document.querySelector('[data-camera-publish]'));
+  if (!toggle && !headless) return;
 
-  const label = toggle.querySelector('[data-camera-label]') ?? toggle;
+  const label = toggle?.querySelector('[data-camera-label]') ?? toggle;
   // Without a strong reference the browser may garbage-collect the socket and
   // silently drop the signaling connection seconds after registering.
   let socket = null;
@@ -106,6 +110,7 @@ function initCameraPublisher() {
   };
 
   const setToggleState = (state) => {
+    if (!toggle) return;
     toggle.dataset.cameraState = state;
     label.textContent = state === 'on' ? 'ON' : 'OFF';
   };
@@ -241,12 +246,8 @@ function initCameraPublisher() {
     }, CONNECTION_RETRY_DELAY_MS);
   };
 
-  toggle.addEventListener('click', async () => {
-    if (toggle.dataset.cameraState === 'on') {
-      stopSharing();
-
-      return;
-    }
+  const activateSharing = async () => {
+    if (mediaStream) return;
 
     try {
       mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -255,8 +256,10 @@ function initCameraPublisher() {
       });
     } catch (error) {
       logClientFailure('Camera activation', error);
-      label.textContent = 'KO';
-      setTimeout(() => setToggleState('off'), 2000);
+      if (label) {
+        label.textContent = 'KO';
+        setTimeout(() => setToggleState('off'), 2000);
+      }
 
       return;
     }
@@ -266,11 +269,21 @@ function initCameraPublisher() {
     sendStatus();
     // Bound viewers are re-handed to us by the server on the status ON above
     // (viewer-joined); offering to them here too would race the renegotiation.
+  };
+
+  toggle?.addEventListener('click', async () => {
+    if (toggle.dataset.cameraState === 'on') {
+      stopSharing();
+
+      return;
+    }
+    await activateSharing();
   });
 
   connect();
-  // Sharing starts on its own when the tablet page loads; the toggle only stops/resumes it.
-  toggle.click();
+  // Sharing starts on its own when the page loads (tablet or slideshow);
+  // on the tablet the toggle only stops/resumes it.
+  activateSharing();
 }
 
 // ---------------------------------------------------------------------------

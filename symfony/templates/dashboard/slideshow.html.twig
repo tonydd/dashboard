@@ -1,7 +1,7 @@
 {% extends 'base.html.twig' %}
 {% block title %}Diaporama{% endblock %}
 {% block body %}
-<main class="slideshow-page">
+<main class="slideshow-page" data-camera-publish>
   <a class="slideshow-target" href="{{ path('dashboard_tablet') }}" aria-label="Afficher la tablette"></a>
   <img
     class="slideshow-image"
