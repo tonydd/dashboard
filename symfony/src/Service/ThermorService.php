@@ -299,9 +299,10 @@ final readonly class ThermorService
             if ($sessionCookie === null || $sessionCookie === '') {
                 throw new \RuntimeException('Overkiz login response did not contain a session cookie.');
             }
-            $cookieValue = str_contains($sessionCookie, '~')
-                ? explode('~', $sessionCookie, 2)[1]
-                : $sessionCookie;
+            // Overkiz sessions are only valid with the full JSESSIONID as
+            // received (including the gateway prefix); stripping the prefix
+            // causes HTTP 401 on subsequent setup and command requests.
+            $cookieValue = $sessionCookie;
 
             $item->expiresAfter(60 * 15);
             return $cookieValue;
