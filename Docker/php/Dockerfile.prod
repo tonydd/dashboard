@@ -53,8 +53,9 @@ RUN mkdir -p var/cache var/log \
     && touch .env \
     && chown -R www-data:www-data var \
     # AssetMapper serves files at runtime only in dev: dump the compiled
-    # assets into public/assets for production.
-    && php bin/console asset-map:compile \
+    # assets into public/assets for production. The kernel boot needs a
+    # DATABASE_URL to build the container, a dummy one is enough here.
+    && DATABASE_URL="mysql://build:build@127.0.0.1:3306/build?serverVersion=8.0" php bin/console asset-map:compile \
     && chown -R www-data:www-data public/assets
 
 EXPOSE 80
