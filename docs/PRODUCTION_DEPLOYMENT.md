@@ -61,7 +61,14 @@ scripts/update-prod-env.sh NOM VALEUR              # met à jour la variable dan
 scripts/add-prod-env.sh NOM VALEUR FICHIER         # ajoute ou met à jour la variable dans un fichier précis
 ```
 
-Par exemple pour la signalisation caméra : `scripts/add-prod-env.sh CAM_WS_BIND_PORT 9102 .env.compose.prod`. Les deux scripts détectent le mode GPG de l'archive (clé publique ou symétrique) et le conservent au réencrypt. `BACKGROUND_HOST_PATH` est facultatif; s'il est omis, Compose utilise `./symfony/var/backgrounds` dans le checkout de déploiement. Générer des mots de passe MySQL distincts, de préférence hexadécimaux, et ne jamais committer le fichier réel. Recréer ensuite le `tar.gz`, le chiffrer avec le même mécanisme GPG que l'archive actuelle, puis vérifier que le script `gpg --decrypt ... | tar xz` peut le lire. Ne remplacer l'archive de production qu'après cette vérification.
+Deux autres scripts lisent l'archive sans la modifier :
+
+```sh
+scripts/read-prod-env.sh NOM FICHIER               # affiche la valeur de la variable (praticable en $(...))
+scripts/copy-prod-env.sh SRC CIBLE VAR[=CIBLE_VAR]… # copie des variables d'un membre à l'autre, une seule phrase secrète
+```
+
+Par exemple pour la signalisation caméra : `scripts/add-prod-env.sh CAM_WS_BIND_PORT 9102 .env.compose.prod`. Pour récupérer les intégrations météo depuis l'ancien `.env` du frontend Vue : `scripts/copy-prod-env.sh .env.vue .env VITE_OPENWEATHERMAP_API_KEY=OPENWEATHERMAP_API_KEY VITE_OPENWEATHERMAP_LAT=OPENWEATHERMAP_LAT VITE_OPENWEATHERMAP_LON=OPENWEATHERMAP_LON`. Les variables absentes de la source sont ignorées avec un avertissement, et l'archive reste intacte si rien n'a été copié. Les scripts détectent le mode GPG de l'archive (clé publique ou symétrique) et le conservent au réencrypt. `BACKGROUND_HOST_PATH` est facultatif; s'il est omis, Compose utilise `./symfony/var/backgrounds` dans le checkout de déploiement. Générer des mots de passe MySQL distincts, de préférence hexadécimaux, et ne jamais committer le fichier réel. Recréer ensuite le `tar.gz`, le chiffrer avec le même mécanisme GPG que l'archive actuelle, puis vérifier que le script `gpg --decrypt ... | tar xz` peut le lire. Ne remplacer l'archive de production qu'après cette vérification.
 
 Le backend utilise toujours `BACKGROUND_PATH` pour servir le fond d'écran quotidien via `/api/background`. Si aucun fichier `.jpg` n'est présent dans le dossier monté, le déploiement ne bloque plus, mais cette route ne pourra pas fournir d'image.
 
