@@ -353,8 +353,14 @@ function initCameraViewer() {
 
         // Re-attach automatically (after a signaling restart the selection
         // survives but the binding does not; the healthcheck re-establishes it).
-        if (selectedId === null && active.length > 0) {
-          setStatus(`${active.length} caméra(s) disponible(s) — cliquez sur une caméra.`);
+        if (selectedId === null) {
+          if (active.length === 1) {
+            // Single usable camera: connect to it right away, no click needed.
+            watchCamera(active[0]);
+          } else {
+            const noun = `caméra${active.length > 1 ? 's' : ''}`;
+            setStatus(`${active.length} ${noun} disponible${active.length > 1 ? 's' : ''} — cliquez sur une caméra.`);
+          }
           break;
         }
 
