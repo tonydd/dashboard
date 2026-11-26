@@ -41,6 +41,24 @@ function updateClock() {
 updateClock();
 setInterval(updateClock, 1000);
 
+// Keep the screen on while the dashboard is visible; the kiosk browser used
+// to handle this and Chrome relies on the Screen Wake Lock API instead.
+let wakeLock = null;
+async function requestWakeLock() {
+  if (!navigator.wakeLock) return;
+  try {
+    if (!wakeLock || wakeLock.released) {
+      wakeLock = await navigator.wakeLock.request('screen');
+    }
+  } catch (error) {
+    logClientFailure('Screen wake lock', error);
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') requestWakeLock();
+});
+requestWakeLock();
+
 const tablet = document.querySelector('[data-auto-slideshow]');
 if (tablet) {
   setTimeout(() => window.location.replace('/slideshow'), Number(tablet.dataset.autoSlideshow));
