@@ -1,0 +1,123 @@
+{% extends 'base.html.twig' %}
+{% block title %}Tablette{% endblock %}
+{% block body %}
+<main class="tablet-page" data-auto-slideshow="{{ slideshowReturnSeconds * 1000 }}">
+  <header class="tablet-clock">
+    <a class="clock-link" href="{{ path('dashboard_slideshow') }}" aria-label="Afficher le diaporama">
+      <div class="clock-date" data-clock-date></div>
+      <div class="clock-time" data-clock-time></div>
+    </a>
+  </header>
+
+  <section class="timers" aria-label="Minuteries">
+    {% for timer in ['stove', 'oven'] %}
+      <button class="timer" type="button" data-timer="{{ timer }}">
+        <span class="timer-name">{{ timer == 'stove' ? 'Plaque' : 'Four' }}</span>
+        <strong data-timer-value="00:00:00">00:00:00</strong>
+      </button>
+    {% endfor %}
+    <button class="timer camera-toggle" type="button" data-camera-toggle data-camera-state="off">
+      <span class="timer-name">Caméra</span>
+      <strong data-camera-label>OFF</strong>
+    </button>
+  </section>
+
+  <button
+    class="weather widget"
+    type="button"
+    data-widget="weather"
+    aria-live="polite"
+    aria-haspopup="dialog"
+    aria-controls="weather-dialog"
+  >
+    <strong>Météo : chargement…</strong>
+  </button>
+
+  <section class="status-grid">
+    <article class="widget" data-widget="solar">
+      <h2>Solaire</h2>
+      {% if solar.production is defined %}
+        <strong>{{ solar.production / 100 }} W</strong>
+      {% else %}<strong>—</strong>{% endif %}
+    </article>
+    <article class="widget" data-widget="thermor">
+      <h2>Chauffe-eau</h2>
+      {% if thermor.available40Degrees is defined %}
+        <strong>{{ ((thermor.available40Degrees * 100) / 200)|round(0) }} %</strong>
+        {% if thermor.heatingState %}<span>En chauffe</span>{% endif %}
+      {% else %}<strong>—</strong>{% endif %}
+    </article>
+    <article class="widget" data-widget="water-quality">
+      <h2>Qualité de l'eau</h2>
+      {% if waterQuality.score is defined %}
+        <strong>{{ waterQuality.score }}/10</strong><span>{{ waterQuality.status|default('') }}</span>
+      {% else %}<strong>—</strong>{% endif %}
+    </article>
+  </section>
+
+  <section class="fuel-news">
+    <article class="widget" data-widget="fuel">
+      <h2>{{ fuelStationName|default('Carburants') }}</h2>
+      {% if fuel is iterable %}
+        {% for name, item in fuel %}
+          <div class="fuel-row"><span>{{ name }}</span><strong>{{ item.price|default('—') }} €</strong></div>
+        {% endfor %}
+      {% endif %}
+    </article>
+    <article class="widget" data-widget="news" aria-live="polite">
+      <h2>Actus SSF</h2>
+      <span>Chargement des actualités…</span>
+    </article>
+  </section>
+
+  <dialog id="weather-dialog" class="weather-dialog" aria-labelledby="weather-dialog-title">
+    <header class="weather-dialog-header">
+      <h2 id="weather-dialog-title">Prévisions des prochains jours</h2>
+      <form method="dialog">
+        <button type="submit" aria-label="Fermer les prévisions météo">Fermer</button>
+      </form>
+    </header>
+    <div id="weather-forecast" class="weather-forecast" aria-live="polite">
+      <p>Chargement des prévisions…</p>
+    </div>
+  </dialog>
+
+  <dialog id="news-dialog" class="news-dialog" aria-labelledby="news-dialog-title">
+    <header class="news-dialog-header">
+      <h2 id="news-dialog-title">Actualité</h2>
+      <form method="dialog">
+        <button type="submit" aria-label="Fermer l’actualité">Fermer</button>
+      </form>
+    </header>
+    <iframe
+      id="news-frame"
+      title="Contenu de l’actualité"
+      sandbox="allow-forms allow-scripts"
+      referrerpolicy="no-referrer"
+    ></iframe>
+    <p class="news-dialog-fallback">
+      Si le site bloque l’affichage intégré,
+      <a id="news-fallback-link" href="#">ouvrir l’article dans cette fenêtre</a>.
+    </p>
+  </dialog>
+
+  <dialog id="timer-dialog">
+    <form method="dialog" id="timer-form">
+      <h2>Durée du minuteur</h2>
+      <div class="timer-presets">
+        {% for seconds in [30,60,120,300,600,1800,3600,7200] %}
+          <button type="button" data-add-seconds="{{ seconds }}">
+            {{ seconds < 60 ? seconds ~ ' s' : (seconds / 60)|round(0) ~ ' min' }}
+          </button>
+        {% endfor %}
+      </div>
+      <label>Temps total (secondes) <input id="timer-seconds" type="number" min="0" value="0"></label>
+      <menu>
+        <button type="button" id="timer-reset">Remettre à zéro</button>
+        <button value="cancel">Fermer</button>
+        <button type="button" id="timer-start">Lancer</button>
+      </menu>
+    </form>
+  </dialog>
+</main>
+{% endblock %}

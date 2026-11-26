@@ -30,6 +30,7 @@ services:
       - "127.0.0.1:${PHP_BIND_PORT:-9100}:80"
     env_file:
       - ${SYMFONY_ENV_FILE:?Set SYMFONY_ENV_FILE to the decrypted Symfony env file}
+      - ${DASHBOARD_ENV_FILE:-/dev/null}
     environment: &app_environment
       APP_ENV: prod
       APP_DEBUG: "0"
@@ -67,6 +68,22 @@ services:
     depends_on:
       database:
         condition: service_healthy
+
+  webcam-ws:
+    build:
+      context: .
+      dockerfile: Docker/php/Dockerfile.prod
+    restart: unless-stopped
+    init: true
+    user: www-data
+    working_dir: /var/www/html
+    env_file:
+      - ${SYMFONY_ENV_FILE:?Set SYMFONY_ENV_FILE to the decrypted Symfony env file}
+    command: ["php", "bin/console", "app:camera:ws", "--host=0.0.0.0", "--port=8080"]
+    environment: *app_environment
+    ports:
+      # Loopback only; the host Apache reverse-proxies /camera-ws (mod_proxy_wstunnel) to it.
+      - "127.0.0.1:${CAM_WS_BIND_PORT:-9102}:8080"
 
   web:
     build:

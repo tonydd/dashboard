@@ -12,4 +12,5 @@ enum KeyValueKey: string
 
     case WaterQuality = 'water_quality';
     case Background = 'day_image';
+    case DashboardSlideshowReturnSeconds = 'dashboard_slideshow_return_seconds';
 }

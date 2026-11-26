@@ -49,9 +49,15 @@ RUN a2dissite 000-default && a2ensite dashboard && a2enmod headers rewrite
 
 WORKDIR /var/www/html
 COPY --from=app-build --chown=www-data:www-data /var/www/html /var/www/html
+# AssetMapper serves files at runtime only in dev: dump the compiled assets
+# into public/assets for production. The kernel boot needs a DATABASE_URL to
+# build the container, a dummy one is enough here. Both commands run as root,
+# so var/ and public/assets are chowned to www-data afterwards (the runtime
+# warmup must be able to write into the cache directory).
 RUN mkdir -p var/cache var/log \
     && touch .env \
-    && chown -R www-data:www-data var
+    && DATABASE_URL="mysql://build:build@127.0.0.1:3306/build?serverVersion=8.0" php bin/console asset-map:compile \
+    && chown -R www-data:www-data var public/assets
 
 EXPOSE 80
 CMD ["apache2-foreground"]

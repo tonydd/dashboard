@@ -1,0 +1,13 @@
+{% extends 'base.html.twig' %}
+{% block title %}Dashboard{% endblock %}
+{% block body %}
+<main class="login-screen">
+  <form id="dashboard-login" class="login-card">
+    <h1>Dashboard</h1>
+    <label for="password">Mot de passe</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" autofocus required>
+    <button type="submit">Se connecter</button>
+    <p id="login-error" role="alert"></p>
+  </form>
+</main>
+{% endblock %}

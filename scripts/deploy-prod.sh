@@ -3,6 +3,8 @@ set -euo pipefail
 umask 077
 
 REPO="https://github.com/tonydd/dashboard.git"
+# Branch to deploy; pass the branch name as the first argument (default: main).
+BRANCH="${1:-main}"
 TIMESTAMP="$(date +%Y%m%d%H%M%S)"
 CLONE_DIR="$(mktemp -d /tmp/dashboard-deploy-XXXXXX)"
 SECRETS_DIR="$(mktemp -d /dev/shm/dashboard-secrets-XXXXXX)"
@@ -30,8 +32,6 @@ gpg --decrypt /home/deploy/secrets/secrets.tar.gz.gpg \
 
 for required_file in \
     .env \
-    .env.vue \
-    .env.production.vue \
     .env.compose.prod
 do
     if [[ ! -f "${SECRETS_DIR}/${required_file}" ]]; then
@@ -40,25 +40,20 @@ do
     fi
 done
 
-echo "=== Préparation des fichiers de build frontend en RAM ==="
-awk '!/^[[:space:]]*(export[[:space:]]+)?VITE_SPOTIFY_CLIENT_SECRET[[:space:]]*=/' \
-    "${SECRETS_DIR}/.env.vue" > "${SECRETS_DIR}/.env.vue.safe"
-awk '!/^[[:space:]]*(export[[:space:]]+)?VITE_SPOTIFY_CLIENT_SECRET[[:space:]]*=/' \
-    "${SECRETS_DIR}/.env.production.vue" > "${SECRETS_DIR}/.env.production.vue.safe"
-
 export SYMFONY_ENV_FILE="${SECRETS_DIR}/.env"
+if [[ -f "${SECRETS_DIR}/.env.production.vue" ]]; then
+    export DASHBOARD_ENV_FILE="${SECRETS_DIR}/.env.production.vue"
+elif [[ -f "${SECRETS_DIR}/.env.vue" ]]; then
+    export DASHBOARD_ENV_FILE="${SECRETS_DIR}/.env.vue"
+fi
 
-echo "=== Clone du dépôt ==="
-git clone --depth 1 "$REPO" "$CLONE_DIR"
+echo "=== Clone du dépôt (branche ${BRANCH}) ==="
+if ! git ls-remote --exit-code --heads "$REPO" "refs/heads/${BRANCH}" >/dev/null 2>&1; then
+    echo "Branche introuvable sur ${REPO} : ${BRANCH}" >&2
+    exit 1
+fi
+git clone --depth 1 --branch "$BRANCH" --single-branch "$REPO" "$CLONE_DIR"
 mkdir -p "${CLONE_DIR}/symfony/var/backgrounds"
-
-echo "=== Préparation des paramètres frontend publics ==="
-mkdir -p "${CLONE_DIR}/Docker/frontend/build-env"
-cp "${SECRETS_DIR}/.env.vue.safe" "${CLONE_DIR}/Docker/frontend/build-env/.env"
-cp "${SECRETS_DIR}/.env.production.vue.safe" "${CLONE_DIR}/Docker/frontend/build-env/.env.production"
-chmod 600 \
-    "${CLONE_DIR}/Docker/frontend/build-env/.env" \
-    "${CLONE_DIR}/Docker/frontend/build-env/.env.production"
 
 echo "=== Validation et build des images de production ==="
 compose config --quiet
@@ -112,9 +107,9 @@ compose run --rm --no-deps --user www-data php \
     --no-interaction --allow-no-migration --env=prod
 
 echo "=== Démarrage des services applicatifs ==="
-compose up -d php web scheduler
+compose up -d php web scheduler webcam-ws
 compose exec --user www-data --no-TTY php php bin/console about --env=prod
 
 echo
-echo "Déploiement Docker terminé : ${TIMESTAMP}"
+echo "Déploiement Docker terminé : ${TIMESTAMP} (branche ${BRANCH})"
 echo "Configurer Apache vers les ports PHP et frontend indiqués dans .env.compose.prod."

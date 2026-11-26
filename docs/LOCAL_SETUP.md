@@ -2,43 +2,46 @@
 
 ## Architecture
 
-- `src/` : application Vue 3/Vite servie sur `http://localhost:5174`.
+- `symfony/templates/dashboard/` : pages `/tablet` et `/slideshow` rendues par Twig.
 - `symfony/` : API Symfony 7.4/PHP servie sur `http://localhost:8000`.
 - `db` : MySQL 8.0, publié sur `localhost:33061`.
-- Docker Compose orchestre les trois services.
+- Docker Compose orchestre Symfony et MySQL.
 
 ## Prérequis
 
 Docker Engine avec la commande `docker compose` est recommandé. Pour un lancement sans Docker :
 
-- Node.js 20+
 - PHP 8.4+
 - Composer 2
 - MySQL 8
 
 ## Configuration
 
-1. Copier la configuration du frontend :
+1. Copier `.env.example` en `.env` à la racine pour la configuration Docker :
 
    ```sh
    cp .env.example .env
    ```
 
-2. Renseigner les clés externes optionnelles dans `.env`. Les widgets non configurés peuvent rester sur `TO_BE_DEFINED`, mais les endpoints API locaux doivent pointer vers `http://localhost:8000`.
+2. Renseigner au besoin `OPENWEATHERMAP_API_KEY`, `OPENWEATHERMAP_LAT`, `OPENWEATHERMAP_LON`, `FUEL_API_STATION_NAME` et `BACKGROUND_TOKEN` dans ce fichier. La clé OpenWeatherMap est passée uniquement au conteneur PHP; elle n'est jamais rendue dans le HTML ou les assets. `BACKGROUND_TOKEN` est ajouté à l'URL de l'image du slideshow et sera visible dans la requête du navigateur. Les anciennes variables `VITE_OPENWEATHERMAP_*`, `VITE_FUEL_API_STATION_NAME` et `VITE_BACKGROUND_TOKEN` sont aussi acceptées par Docker Compose pour faciliter la migration.
 
-3. Démarrer Docker Compose :
+3. Pour lancer Symfony directement sans Docker, configurer ces valeurs dans `symfony/.env.local` avec les noms `OPENWEATHERMAP_*` (sans le préfixe `VITE_`). Les widgets non configurés affichent un état d'indisponibilité.
+
+La page tablette rend immédiatement les valeurs métier déjà stockées. Météo et actualités commencent en état de chargement, puis sont demandées au navigateur après l'affichage de la page afin qu'une panne lente d'un fournisseur ne retarde pas le HTML.
+
+4. Démarrer Docker Compose :
 
    ```sh
    docker compose up --build
    ```
 
-4. Initialiser la base Symfony :
+5. Initialiser la base Symfony :
 
    ```sh
    docker compose exec php sh -c 'cd /var/www/html && php bin/console doctrine:migrations:migrate --no-interaction'
    ```
 
-Le PHP est accessible sur `http://localhost:8000`; Vite est accessible sur `http://localhost:5174`.
+Symfony sert directement le dashboard sur `http://localhost:8000/tablet` et `http://localhost:8000/slideshow`.
 
 ## Base de données
 
@@ -140,13 +143,6 @@ php bin/console messenger:consume scheduler_default --time-limit=3600
 ```
 
 ## Lancement sans Docker
-
-Frontend :
-
-```sh
-npm install
-npm run dev
-```
 
 Backend :
 

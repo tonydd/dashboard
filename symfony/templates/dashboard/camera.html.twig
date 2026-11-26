@@ -1,0 +1,15 @@
+{% extends 'base.html.twig' %}
+{% block title %}Caméra{% endblock %}
+{% block body %}
+<main class="camera-page">
+  <header class="camera-header">
+    <a href="{{ path('dashboard_slideshow') }}" class="camera-return">Diaporama</a>
+    <span data-camera-status aria-live="polite">Connexion…</span>
+  </header>
+  <video data-camera-viewer class="camera-video" autoplay playsinline muted></video>
+  <div class="camera-list-wrapper">
+    <span class="camera-list-title">Caméras — cliquez pour voir le flux</span>
+    <ul data-camera-list class="camera-list"></ul>
+  </div>
+</main>
+{% endblock %}

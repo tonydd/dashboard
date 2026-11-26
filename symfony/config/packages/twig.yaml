@@ -1,5 +1,8 @@
 twig:
     file_name_pattern: '*.twig'
+    globals:
+        # Empty default: camera.js then derives a same-origin ws(s)://host/camera-ws URL.
+        camera_ws_url: '%env(default::CAMERA_WS_URL)%'
 
 when@test:
     twig:

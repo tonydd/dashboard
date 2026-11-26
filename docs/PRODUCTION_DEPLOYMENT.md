@@ -4,22 +4,27 @@ La production conserve Apache sur l'hôte pour les certificats TLS et les deux n
 
 Les services exposent uniquement des ports loopback :
 
-- `web` sert le frontend compilé et relaie `/api/` vers Symfony sur `127.0.0.1:9101` par défaut.
+- `web` est un proxy Caddy léger vers Symfony sur `127.0.0.1:9101` par défaut.
 - `php` sert Symfony/Apache sur `127.0.0.1:9100` par défaut.
 - `scheduler` exécute `messenger:consume scheduler_default` et redémarre automatiquement.
+- `webcam-ws` exécute le serveur de signalisation caméra (`app:camera:ws`) sur `127.0.0.1:9102` par défaut ; il ne dépend pas de MySQL (jetons signés HMAC avec `APP_SECRET`).
 - `database` utilise un volume Docker persistant et n'expose aucun port à l'hôte.
 
 ## Apache hôte
 
-Activer les modules `proxy` et `proxy_http`. Dans le VirtualHost frontend, remplacer le `DocumentRoot` et les anciennes règles de fallback Vue par ces relais :
+Activer les modules `proxy`, `proxy_http` et `proxy_wstunnel`. Dans le VirtualHost frontend, remplacer le `DocumentRoot` et les anciennes règles de fallback par ces relais :
 
 ```apache
 ProxyPreserveHost On
+ProxyPass /camera-ws ws://127.0.0.1:9102/camera-ws
+ProxyPassReverse /camera-ws ws://127.0.0.1:9102/camera-ws
 ProxyPass /api/ http://127.0.0.1:9101/api/
 ProxyPassReverse /api/ http://127.0.0.1:9101/api/
 ProxyPass / http://127.0.0.1:9101/
 ProxyPassReverse / http://127.0.0.1:9101/
 ```
+
+Le relais `/camera-ws` sert la signalisation WebSocket de la caméra (page tablette et page caméra) ; il doit être déclaré avant la règle générique `/`. En HTTPS, Apache termine le TLS et le navigateur utilise `wss://…/camera-ws` automatiquement. Laisser `CAMERA_WS_URL` vide dans le `.env` Symfony : le front déduit alors l'URL depuis le domaine visité (`ws` ou `wss` selon le schéma). Ne la renseigner que si la signalisation doit passer par un domaine ou un port distinct, par exemple `ws://{host}:8081` (`{host}` est remplacé par le nom d'hôte du navigateur).
 
 Le VirtualHost de l'API doit aussi remplacer son `DocumentRoot` et son `FallbackResource` pour relayer vers Symfony :
 
@@ -31,33 +36,45 @@ ProxyPassReverse / http://127.0.0.1:9100/
 
 Garder les directives SSL et les certificats existants. Si le VirtualHost frontend conserve une règle dédiée pour `/api/random-image/`, la placer avant les règles génériques et la faire pointer vers le port frontend choisi. Tester les deux VirtualHosts et recharger Apache avant de basculer le trafic. Choisir deux ports loopback libres dans `.env.compose.prod`.
 
-Comme le navigateur passe par le VirtualHost frontend, les variables frontend `VITE_API_BASE_URL`, `VITE_FUEL_API_URL`, `VITE_SOLAR_API_URL`, `VITE_WATER_HEATER_API_URL` et `VITE_WATER_QUALITY_API_URL` doivent utiliser les chemins relatifs `/api/...`. Un nom d'hôte API distinct crée des appels cross-origin et exige un certificat TLS valide pour ce nom ainsi qu'une configuration CORS correspondante. `VITE_BACKGROUND_URL` doit être `/api/background`; sans images `.jpg`, cette route répond `404`.
+Le navigateur accède uniquement à Symfony via Caddy/Apache. Les intégrations de données utilisent les endpoints relatifs `/api/...` et les secrets restent dans l'environnement Symfony. Sans images `.jpg`, `/api/background` répond `404`.
 
 ## Configuration et secrets
 
 Le script de déploiement s'attend à trouver dans l'archive GPG, extraite sous `/dev/shm` :
 
 - `.env` : variables Symfony et secrets backend existants.
-- `.env.vue` : configuration Vite commune.
-- `.env.production.vue` : configuration Vite de production.
 - `.env.compose.prod` : paramètres MySQL Docker et, facultativement, le dossier hôte des fonds d'écran (`BACKGROUND_HOST_PATH`), basé sur `.env.compose.prod.example`.
 - `database.sql.gz` : export initial de la base MySQL existante, requis uniquement lors du premier déploiement dans un volume vide.
 
-Ces fichiers doivent être à la racine de l'archive, pas dans un sous-dossier. `.env.compose.prod.example` et `.env.production.vue.example` sont des modèles du dépôt, pas des fichiers à inclure dans l'archive. Le script exige les quatre premiers fichiers et exige le dump seulement si le volume MySQL Docker est vide.
+Ces fichiers doivent être à la racine de l'archive, pas dans un sous-dossier. `.env.compose.prod.example` et `.env.example` sont des modèles du dépôt, pas des fichiers à inclure dans l'archive. Le script exige `.env` et `.env.compose.prod`, ainsi que le dump uniquement si le volume MySQL Docker est vide.
+
+La configuration serveur de la météo et du nom de station carburant se place dans le `.env` Symfony chiffré sous `OPENWEATHERMAP_API_URL`, `OPENWEATHERMAP_API_KEY`, `OPENWEATHERMAP_LAT`, `OPENWEATHERMAP_LON`, `OPENWEATHERMAP_UNITS`, `OPENWEATHERMAP_LANG` et `FUEL_API_STATION_NAME`. La clé météo reste dans l'environnement du conteneur PHP et n'est jamais intégrée aux assets ni renvoyée au navigateur. Pour le slideshow, renseigner au besoin `BACKGROUND_TOKEN` dans le même fichier : il est ajouté à l'URL de l'image distante et sera donc visible dans la requête du navigateur. Pour faciliter la bascule, les anciens fichiers `.env.production.vue` ou `.env.vue` de l'archive sont facultatifs : le script en passe un au conteneur PHP seulement si présent, et Symfony accepte les anciennes clés `VITE_OPENWEATHERMAP_*`, `VITE_FUEL_API_STATION_NAME` et `VITE_BACKGROUND_TOKEN` comme repli. Les nouveaux noms sans `VITE_` sont prioritaires.
 
 `THERMOR_API_TOKEN` est facultatif : sans cette variable, la lecture de l'état du chauffe-eau reste disponible, mais les commandes de pilotage répondent `503` jusqu'à sa configuration.
 
-Pour préparer l'archive, partir de l'archive actuelle, la déchiffrer dans un dossier temporaire sous `/dev/shm`, puis y ajouter ou remplacer `.env.compose.prod`. Copier les valeurs du modèle `.env.compose.prod.example` et renseigner les identifiants MySQL et deux ports loopback libres (`9100` pour l'API et `9101` pour le frontend par défaut). `BACKGROUND_HOST_PATH` est facultatif; s'il est omis, Compose utilise `./symfony/var/backgrounds` dans le checkout de déploiement. Générer des mots de passe MySQL distincts, de préférence hexadécimaux, et ne jamais committer le fichier réel. Recréer ensuite le `tar.gz`, le chiffrer avec le même mécanisme GPG que l'archive actuelle, puis vérifier que le script `gpg --decrypt ... | tar xz` peut le lire. Ne remplacer l'archive de production qu'après cette vérification.
+Pour préparer l'archive, partir de l'archive actuelle, la déchiffrer dans un dossier temporaire sous `/dev/shm`, puis y ajouter ou remplacer `.env.compose.prod`. Copier les valeurs du modèle `.env.compose.prod.example` et renseigner les identifiants MySQL et trois ports loopback libres (`9100` pour l'API, `9101` pour le frontend et `9102` pour la signalisation caméra par défaut).
+
+Deux scripts modifient l'archive chiffrée en place (déchiffrement en RAM, vérification post-réencrypt, sauvegarde `.bak` puis remplacement atomique) :
+
+```sh
+scripts/update-prod-env.sh NOM VALEUR              # met à jour la variable dans tous les .env* où elle existe déjà
+scripts/add-prod-env.sh NOM VALEUR FICHIER         # ajoute ou met à jour la variable dans un fichier précis
+```
+
+Deux autres scripts lisent l'archive sans la modifier :
+
+```sh
+scripts/read-prod-env.sh NOM FICHIER               # affiche la valeur de la variable (praticable en $(...))
+scripts/copy-prod-env.sh SRC CIBLE VAR[=CIBLE_VAR]… # copie des variables d'un membre à l'autre, une seule phrase secrète
+```
+
+Par exemple pour la signalisation caméra : `scripts/add-prod-env.sh CAM_WS_BIND_PORT 9102 .env.compose.prod`. Pour récupérer les intégrations météo depuis l'ancien `.env` du frontend Vue : `scripts/copy-prod-env.sh .env.vue .env VITE_OPENWEATHERMAP_API_KEY=OPENWEATHERMAP_API_KEY VITE_OPENWEATHERMAP_LAT=OPENWEATHERMAP_LAT VITE_OPENWEATHERMAP_LON=OPENWEATHERMAP_LON`. Les variables absentes de la source sont ignorées avec un avertissement, et l'archive reste intacte si rien n'a été copié. Les scripts détectent le mode GPG de l'archive (clé publique ou symétrique) et le conservent au réencrypt. `BACKGROUND_HOST_PATH` est facultatif; s'il est omis, Compose utilise `./symfony/var/backgrounds` dans le checkout de déploiement. Générer des mots de passe MySQL distincts, de préférence hexadécimaux, et ne jamais committer le fichier réel. Recréer ensuite le `tar.gz`, le chiffrer avec le même mécanisme GPG que l'archive actuelle, puis vérifier que le script `gpg --decrypt ... | tar xz` peut le lire. Ne remplacer l'archive de production qu'après cette vérification.
 
 Le backend utilise toujours `BACKGROUND_PATH` pour servir le fond d'écran quotidien via `/api/background`. Si aucun fichier `.jpg` n'est présent dans le dossier monté, le déploiement ne bloque plus, mais cette route ne pourra pas fournir d'image.
 
 Pour créer le dump initial depuis la base MySQL actuelle, exécuter par exemple `mysqldump -u UTILISATEUR -p --single-transaction --routines --triggers --events --databases NOM_BASE | gzip > /dev/shm/database.sql.gz`, puis vérifier le résultat avec `gzip -t /dev/shm/database.sql.gz`. Le dump contient les données de production : le garder temporairement en RAM et le chiffrer dans l'archive. Conserver également une sauvegarde indépendante avant la bascule. Les redéploiements suivants n'ont pas besoin de `database.sql.gz` tant que le volume Docker contient déjà les tables.
 
-Le fichier Symfony et les identifiants MySQL restent dans `/dev/shm`; le `.env` Symfony est injecté au runtime. Les seuls fichiers copiés temporairement dans le clone sont les paramètres `VITE_*` publics du frontend, après suppression du secret client Spotify. Ils sont supprimés avec le clone en fin de déploiement. Les mots de passe MySQL utilisés dans `DATABASE_URL` doivent être URL-safe; des secrets hexadécimaux conviennent.
-
-Tout `VITE_*` est incorporé au bundle et visible dans le navigateur. Le composant `Spotify.vue` est le widget maison du tableau de bord : il affiche la lecture en cours et permet précédent, pause/reprise et suivant. Il utilise actuellement `VITE_SPOTIFY_CLIENT_SECRET` dans le navigateur pour obtenir et renouveler les jetons; ce secret serait donc récupérable par toute personne consultant le bundle. Le script l'exclut volontairement. En conséquence, une nouvelle connexion Spotify et le renouvellement des jetons échoueront tant que le widget n'aura pas été migré.
-
-Pour une application frontend publique, PKCE (« Proof Key for Code Exchange ») permet d'utiliser le flux OAuth Authorization Code sans secret client : le navigateur génère une preuve temporaire, Spotify la lie à la demande d'autorisation, puis le navigateur doit fournir cette même preuve pour échanger le code contre des jetons. L'autre option est de déplacer l'échange et le renouvellement des jetons dans Symfony, où le secret peut rester côté serveur. Ni l'une ni l'autre migration n'est incluse dans le déploiement Docker décrit ici.
+Le fichier Symfony et les identifiants MySQL restent dans `/dev/shm`; le `.env` Symfony est injecté au runtime. Aucun secret n'est incorporé aux assets Twig/JavaScript. Les mots de passe MySQL utilisés dans `DATABASE_URL` doivent être URL-safe; des secrets hexadécimaux conviennent.
 
 ## Données MySQL
 
@@ -69,7 +86,14 @@ Prévoir des sauvegardes régulières du volume de production. Les migrations so
 
 ## Déploiement et exploitation
 
-Remplacer l'ancien script de déploiement par `scripts/deploy-prod.sh`. Il clone le dépôt, déchiffre les secrets en RAM, construit et démarre les services, importe le dump uniquement au premier démarrage et applique les migrations. Le service Docker `scheduler` remplace l'ancien worker Supervisor. Pour les déploiements suivants, l'archive peut omettre `database.sql.gz`.
+Remplacer l'ancien script de déploiement par `scripts/deploy-prod.sh`. Il clone le dépôt, déchiffre les secrets en RAM, construit et démarre les services, importe le dump uniquement au premier démarrage et applique les migrations. La branche à déployer se passe en premier argument (défaut `main`) :
+
+```sh
+scripts/deploy-prod.sh            # branche main
+scripts/deploy-prod.sh revamp-front
+```
+
+Le service Docker `scheduler` remplace l'ancien worker Supervisor. Pour les déploiements suivants, l'archive peut omettre `database.sql.gz`.
 
 Après avoir vérifié que le worker Docker `dashboard-prod-scheduler-1` fonctionne, désactiver l'ancien worker Supervisor. Si aucun autre programme n'est géré par Supervisor :
 
@@ -87,5 +111,5 @@ Les commandes Compose utilisent le nom de projet fixe `dashboard-prod` afin de c
 
 ```sh
 docker compose -p dashboard-prod --env-file /dev/shm/.../.env.compose.prod -f compose.prod.yml ps
-docker compose -p dashboard-prod --env-file /dev/shm/.../.env.compose.prod -f compose.prod.yml logs -f web php scheduler database
+docker compose -p dashboard-prod --env-file /dev/shm/.../.env.compose.prod -f compose.prod.yml logs -f web php scheduler webcam-ws database
 ```
