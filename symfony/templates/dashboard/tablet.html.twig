@@ -1,7 +1,11 @@
 {% extends 'base.html.twig' %}
 {% block title %}Tablette{% endblock %}
 {% block body %}
-<main class="tablet-page" data-auto-slideshow="{{ slideshowReturnSeconds * 1000 }}">
+<main
+  class="tablet-page"
+  data-auto-slideshow="{{ slideshowReturnSeconds * 1000 }}"
+  {% if tabletBackgroundUrl %}style="background-image: url('{{ tabletBackgroundUrl }}')"{% endif %}
+>
   <header class="tablet-clock">
     <a class="clock-link" href="{{ path('dashboard_slideshow') }}" aria-label="Afficher le diaporama">
       <div class="clock-date" data-clock-date></div>

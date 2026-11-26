@@ -1,0 +1,51 @@
+{% extends 'base.html.twig' %}
+{% block title %}Image de fond{% endblock %}
+{% block body %}
+<main class="tablet-background-page">
+  <header class="status-header">
+    <a href="{{ path('dashboard_tablet') }}" class="status-return">← Tablette</a>
+    <h1>Image de fond de la tablette</h1>
+  </header>
+
+  {% if error %}
+    <p class="background-error" role="alert">{{ error }}</p>
+  {% endif %}
+
+  <section class="widget background-current">
+    <h2>Image actuelle</h2>
+    {% if background is not null %}
+      {% if background.type == 'url' %}
+        <p class="background-url">{{ background.url }}</p>
+        <img src="{{ background.url }}" alt="Image de fond actuelle" referrerpolicy="no-referrer">
+      {% else %}
+        <img src="{{ path('api_tablet_background_image') }}?v={{ updatedAt ? updatedAt|date('U') : '' }}" alt="Image de fond actuelle">
+      {% endif %}
+    {% else %}
+      <p>Aucune image définie — la tablette utilise son fond par défaut.</p>
+    {% endif %}
+  </section>
+
+  <form method="post" enctype="multipart/form-data" class="widget background-form">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token('tablet_background') }}">
+    <h2>Modifier</h2>
+    <label>
+      URL de l’image
+      <input type="url" name="url" placeholder="https://exemple.com/image.jpg" autocomplete="off">
+    </label>
+    <label>
+      Fichier (JPG, PNG, WebP ou GIF, 5 Mo max)
+      <input type="file" name="image" accept="image/jpeg,image/png,image/webp,image/gif">
+    </label>
+    <p class="background-hint">Si les deux sont renseignés, le fichier envoyé est prioritaire.</p>
+    <button type="submit">Enregistrer</button>
+  </form>
+
+  {% if background is not null %}
+  <form method="post" class="background-clear-form">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token('tablet_background') }}">
+    <input type="hidden" name="action" value="clear">
+    <button type="submit">Réinitialiser (fond par défaut)</button>
+  </form>
+  {% endif %}
+</main>
+{% endblock %}

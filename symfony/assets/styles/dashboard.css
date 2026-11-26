@@ -65,6 +65,8 @@ body {
   padding: 22px;
   overflow: hidden;
   background: #17232d;
+  background-size: cover;
+  background-position: center;
 }
 
 .tablet-clock {
@@ -711,4 +713,107 @@ dialog::backdrop {
   color: var(--muted);
   font-size: 16px;
   text-align: center;
+}
+
+/* --------------------- Tablet background settings page --------------------- */
+
+.tablet-background-page {
+  display: grid;
+  gap: 20px;
+  width: min(760px, 100%);
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.background-error {
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid #8a4438;
+  border-radius: 10px;
+  background: #3a2420;
+  color: #f4b6a8;
+}
+
+.background-current {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.background-current h2,
+.background-form h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.background-current img {
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: 10px;
+}
+
+.background-current .background-url {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--accent-cool);
+  font-size: 14px;
+}
+
+.background-form {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.background-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.background-form input[type='url'],
+.background-form input[type='file'] {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: #17232d;
+  color: inherit;
+  font-size: 16px;
+}
+
+.background-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.background-form button,
+.background-clear-form button {
+  min-height: 48px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #20170d;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.background-clear-form button {
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  color: var(--muted);
+  font-weight: 400;
+  justify-self: start;
 }

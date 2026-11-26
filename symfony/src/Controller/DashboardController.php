@@ -6,6 +6,7 @@ use App\Enum\KeyValueKey;
 use App\Repository\KeyValueRepository;
 use App\Service\DashboardFeedService;
 use App\Service\DashboardSettingsService;
+use App\Service\TabletBackgroundService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -22,6 +23,7 @@ class DashboardController extends AbstractController
         private readonly string $backgroundToken,
         private readonly DashboardSettingsService $settings,
         private readonly DashboardFeedService $feeds,
+        private readonly TabletBackgroundService $tabletBackgrounds,
     ) {
     }
 
@@ -114,7 +116,20 @@ class DashboardController extends AbstractController
             'fuel' => $this->keyValues->getValue(KeyValueKey::Fuel) ?? [],
             'fuelStationName' => $this->fuelStationName,
             'slideshowReturnSeconds' => $this->settings->slideshowReturnSeconds(),
+            'tabletBackgroundUrl' => $this->tabletBackgroundUrl(),
         ];
+    }
+
+    private function tabletBackgroundUrl(): ?string
+    {
+        if ($this->tabletBackgrounds->get() === null) {
+            return null;
+        }
+
+        $url = $this->generateUrl('api_tablet_background_image');
+        $updatedAt = $this->keyValues->getUpdatedAt(KeyValueKey::TabletBackground);
+
+        return $updatedAt === null ? $url : sprintf('%s?v=%d', $url, $updatedAt->getTimestamp());
     }
 
 }
