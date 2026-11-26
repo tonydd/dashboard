@@ -20,6 +20,18 @@ final readonly class ThermorService
     private const SETUP_CACHE_KEY = 'thermorSetupData';
     private const SETUP_CACHE_TTL = 55;
 
+    // Parameter vocabularies as used by the Overkiz cloud for this device
+    // (mirrors the pyoverkiz / Home-Assistant command parameters). Values
+    // marked "unconfirmed" have never been sent for real yet.
+    private const DHW_MODES = ['autoMode', 'manualEcoActive', 'manualEcoInactive'];
+    private const SMART_GRID_OPTIONS = ['deactive', 'active']; // 'active' unconfirmed
+    private const OPERATING_RANGES = ['pac24h_elec24h', 'pacProg_elecProg'];
+    private const TARGET_TEMPERATURE_MIN = 50.0; // core:MinimalTemperatureManualModeState
+    private const TARGET_TEMPERATURE_MAX = 65.0; // core:MaximalTemperatureManualModeState
+    private const EXPECTED_NUMBER_OF_SHOWER_MIN = 1; // core:MinimalShowerManualModeState
+    private const EXPECTED_NUMBER_OF_SHOWER_MAX = 5; // core:MaximalShowerManualModeState
+    private const HEATER_DEVICE = 'modbuslink:AtlanticDomesticHotWaterProductionMBLComponent';
+
     public function __construct(
         private EntityManagerInterface     $entityManager,
         private CacheInterface             $cache,
@@ -58,25 +70,191 @@ final readonly class ThermorService
         return $this->applyAbsenceMode($enabled, true);
     }
 
-    private function applyAbsenceMode(bool $enabled, bool $skipIfAlreadyInRequestedState): array
-    {
-        $setup = $this->fetchSetup();
-        $cookieValue = $this->endUserAPILogin($this->magellanToken($this->atlanticToken()));
+    /**
+     * Every user-facing water-heater action below validates its input,
+     * then dispatches one exec call (possibly several commands batched)
+     * through the shared rate-limited HTTP plumbing.
+     */
 
-        $heater = null;
+    public function setTargetTemperature(float $temperature): array
+    {
+        if ($temperature < self::TARGET_TEMPERATURE_MIN || $temperature > self::TARGET_TEMPERATURE_MAX) {
+            throw new \InvalidArgumentException(sprintf(
+                'The water-heater target temperature must be between %.0f and %.0f degrees.',
+                self::TARGET_TEMPERATURE_MIN,
+                self::TARGET_TEMPERATURE_MAX,
+            ));
+        }
+
+        return $this->dispatchAction([
+            ['name' => 'setTargetDHWTemperature', 'parameters' => [$temperature]],
+        ]);
+    }
+
+    public function setDhwMode(string $mode): array
+    {
+        if (!in_array($mode, self::DHW_MODES, true)) {
+            throw new \InvalidArgumentException(sprintf('Unknown water-heater DHW mode "%s".', $mode));
+        }
+
+        return $this->dispatchAction([
+            ['name' => 'setDHWMode', 'parameters' => [$mode]],
+        ]);
+    }
+
+    public function setBoostMode(bool $enabled): array
+    {
+        return $this->dispatchAction([
+            ['name' => 'setBoostMode', 'parameters' => [$enabled ? 'on' : 'off']],
+        ]);
+    }
+
+    public function setAntiLegionellosis(bool $enabled): array
+    {
+        // modbuslink:AntiLegionellosisState is reported as an integer; the
+        // exact set-parameter format has not been confirmed on a live call yet.
+        return $this->dispatchAction([
+            ['name' => 'setAntiLegionellosis', 'parameters' => [$enabled ? 1 : 0]],
+        ]);
+    }
+
+    public function setSmartGridOption(string $option): array
+    {
+        if (!in_array($option, self::SMART_GRID_OPTIONS, true)) {
+            throw new \InvalidArgumentException(sprintf('Unknown water-heater smart-grid option "%s".', $option));
+        }
+
+        return $this->dispatchAction([
+            ['name' => 'setSmartGridOption', 'parameters' => [$option]],
+        ]);
+    }
+
+    public function setOperatingRange(string $range): array
+    {
+        if (!in_array($range, self::OPERATING_RANGES, true)) {
+            throw new \InvalidArgumentException(sprintf('Unknown water-heater operating range "%s".', $range));
+        }
+
+        return $this->dispatchAction([
+            ['name' => 'setOperatingRange', 'parameters' => [$range]],
+        ]);
+    }
+
+    public function setExpectedNumberOfShower(int $count): array
+    {
+        if ($count < self::EXPECTED_NUMBER_OF_SHOWER_MIN || $count > self::EXPECTED_NUMBER_OF_SHOWER_MAX) {
+            throw new \InvalidArgumentException(sprintf(
+                'The expected number of showers must be between %d and %d.',
+                self::EXPECTED_NUMBER_OF_SHOWER_MIN,
+                self::EXPECTED_NUMBER_OF_SHOWER_MAX,
+            ));
+        }
+
+        return $this->dispatchAction([
+            ['name' => 'setExpectedNumberOfShower', 'parameters' => [$count]],
+        ]);
+    }
+
+    public function setProgrammingSlots(array $slots): array
+    {
+        $this->assertProgrammingSlots($slots);
+
+        return $this->dispatchAction([
+            ['name' => 'setProgrammingSlots', 'parameters' => [$slots]],
+        ]);
+    }
+
+    public function synchronizeDateTime(): array
+    {
+        $now = new \DateTimeImmutable('now', new \DateTimeZone($this->appTimezone));
+
+        return $this->dispatchAction([
+            ['name' => 'setDateTime', 'parameters' => [$this->dateParameters($now)]],
+        ]);
+    }
+
+    private function assertProgrammingSlots(array $slots): void
+    {
+        if ($slots === []) {
+            throw new \InvalidArgumentException('The water-heater programming slots must not be empty.');
+        }
+
+        foreach ($slots as $name => $slot) {
+            if (!is_string($name) || !preg_match('/^slot\d+$/', $name)
+                || !is_array($slot)
+                || !isset($slot['start'], $slot['end'])
+                || !is_string($slot['start']) || !is_string($slot['end'])
+                || !preg_match('/^\d{2}:\d{2}$/', $slot['start'])
+                || !preg_match('/^\d{2}:\d{2}$/', $slot['end'])
+            ) {
+                throw new \InvalidArgumentException(
+                    'The water-heater programming slots must look like {"slot1": {"start": "08:00", "end": "20:00"}}.',
+                );
+            }
+        }
+    }
+
+    /**
+     * One setup read + one exec call carrying every command of the action.
+     */
+    private function dispatchAction(array $commands): array
+    {
+        $this->runDeviceCommands($this->findHeater($this->fetchSetup()), $commands);
+
+        return ['accepted' => true];
+    }
+
+    private function findHeater(array $setup): array
+    {
         foreach ($setup['devices'] ?? [] as $device) {
-            if (($device['controllableName'] ?? null) === 'modbuslink:AtlanticDomesticHotWaterProductionMBLComponent') {
-                $heater = $device;
-                break;
+            if (!is_array($device)
+                || ($device['controllableName'] ?? null) !== self::HEATER_DEVICE
+                || !isset($device['deviceURL'])
+            ) {
+                continue;
+            }
+
+            if (($device['available'] ?? false) !== true) {
+                throw new \RuntimeException('The Overkiz water heater is unavailable.');
+            }
+
+            return $device;
+        }
+
+        throw new \RuntimeException('The Overkiz water heater was not found in the setup response.');
+    }
+
+    private function runDeviceCommands(array $heater, array $commands): void
+    {
+        $deviceCommands = $heater['definition']['commands'] ?? [];
+        if (!is_array($deviceCommands)) {
+            throw new \RuntimeException('The Overkiz water-heater command list is invalid.');
+        }
+        $availableCommands = array_column($deviceCommands, 'commandName');
+        foreach ($commands as $command) {
+            if (!in_array($command['name'], $availableCommands, true)) {
+                throw new \RuntimeException(sprintf('The Overkiz water heater does not support "%s".', $command['name']));
             }
         }
 
-        if ($heater === null || !isset($heater['deviceURL'])) {
-            throw new \RuntimeException('The Overkiz water heater was not found in the setup response.');
+        $cookieValue = $this->endUserAPILogin($this->magellanToken($this->atlanticToken()));
+        try {
+            $this->runCommands($cookieValue, $heater['deviceURL'], $commands);
+        } catch (OverkizApiException $e) {
+            if (!$e->isSessionError()) {
+                throw $e;
+            }
+            // The session died mid-way; commands are idempotent, re-apply
+            // them all with a fresh session.
+            $cookieValue = $this->endUserAPILogin($this->magellanToken($this->atlanticToken()), true);
+            $this->runCommands($cookieValue, $heater['deviceURL'], $commands);
         }
-        if (($heater['available'] ?? false) !== true) {
-            throw new \RuntimeException('The Overkiz water heater is unavailable.');
-        }
+        $this->cache->delete(self::SETUP_CACHE_KEY);
+    }
+
+    private function applyAbsenceMode(bool $enabled, bool $skipIfAlreadyInRequestedState): array
+    {
+        $heater = $this->findHeater($this->fetchSetup());
 
         if ($skipIfAlreadyInRequestedState) {
             $states = $heater['states'] ?? [];
@@ -130,29 +308,7 @@ final readonly class ThermorService
             ];
         }
 
-        $deviceCommands = $heater['definition']['commands'] ?? [];
-        if (!is_array($deviceCommands)) {
-            throw new \RuntimeException('The Overkiz water-heater command list is invalid.');
-        }
-        $availableCommands = array_column($deviceCommands, 'commandName');
-        foreach ($commands as $command) {
-            if (!in_array($command['name'], $availableCommands, true)) {
-                throw new \RuntimeException(sprintf('The Overkiz water heater does not support "%s".', $command['name']));
-            }
-        }
-
-        try {
-            $this->runCommands($cookieValue, $heater['deviceURL'], $commands);
-        } catch (OverkizApiException $e) {
-            if (!$e->isSessionError()) {
-                throw $e;
-            }
-            // The session died mid-way; commands are idempotent, re-apply
-            // them all with a fresh session.
-            $cookieValue = $this->endUserAPILogin($this->magellanToken($this->atlanticToken()), true);
-            $this->runCommands($cookieValue, $heater['deviceURL'], $commands);
-        }
-        $this->cache->delete(self::SETUP_CACHE_KEY);
+        $this->runDeviceCommands($heater, $commands);
 
         return [
             'enabled' => $enabled,

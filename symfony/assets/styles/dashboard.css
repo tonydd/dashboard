@@ -817,3 +817,151 @@ dialog::backdrop {
   font-weight: 400;
   justify-self: start;
 }
+
+/* Water-heater admin screen */
+
+.water-heater-page {
+  display: grid;
+  gap: 18px;
+  width: min(860px, 100%);
+  margin: 0 auto;
+  padding: 24px 16px;
+  justify-items: stretch;
+}
+
+.water-heater-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.water-heater-header h1 {
+  margin: 0;
+  font-size: 26px;
+}
+
+.water-heater-header a {
+  color: var(--accent-cool);
+}
+
+.water-heater-page .widget {
+  padding: 16px;
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.water-heater-page .widget h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+.thermor-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.thermor-facts dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.thermor-facts dd {
+  margin: 2px 0 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.thermor-hint {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.thermor-result {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.thermor-result[data-thermor-result-state='error'] {
+  background: #4b2326;
+  color: #f6c9cd;
+}
+
+.thermor-result[data-thermor-result-state='success'] {
+  background: #1f3a33;
+  color: #bfe8db;
+}
+
+.water-heater-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.action-bar label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.action-bar input,
+.action-bar select {
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: #17232d;
+  color: inherit;
+  font-size: 15px;
+}
+
+.action-bar button {
+  min-height: 40px;
+  padding: 0 16px;
+  margin-left: auto;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #20170d;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.action-bar button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.thermor-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.thermor-table th,
+.thermor-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--panel-border);
+  text-align: left;
+}
+
+.thermor-table th {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}

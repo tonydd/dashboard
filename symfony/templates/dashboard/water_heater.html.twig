@@ -1,0 +1,178 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Chauffe-eau — Admin{% endblock %}
+
+{% block body %}
+<main class="water-heater-page">
+  <header class="water-heater-header">
+    <h1>Chauffe-eau</h1>
+    <nav><a href="{{ path('dashboard_tablet') }}">← Tablette</a></nav>
+  </header>
+
+  <section class="widget water-heater-current">
+    <h2>État actuel</h2>
+    {% if current %}
+      <dl class="thermor-facts">
+        <div><dt>Chauffe</dt><dd>{{ current.heatingState|default(false) ? 'en cours' : 'arrêtée' }}</dd></div>
+        <div><dt>Absence</dt><dd>{{ current.absenceMode|default(false) ? 'activée' : 'désactivée' }}</dd></div>
+        <div><dt>Température eau</dt><dd>{{ current.waterTemperature is defined ? current.waterTemperature ~ ' °C' : '—' }}</dd></div>
+        <div><dt>Eau disponible (V40)</dt><dd>{{ current.available40Degrees|default('—') }} L</dd></div>
+        <div><dt>Consommation totale</dt><dd>{{ current.wh is defined ? (current.wh / 1000)|round(1) ~ ' kWh' : '—' }}</dd></div>
+        <div><dt>Relevé</dt><dd data-thermor-read-at>{{ current.ts|default('—') }}</dd></div>
+      </dl>
+    {% else %}
+      <p>Aucun relevé disponible pour l'instant.</p>
+    {% endif %}
+  </section>
+
+  <section class="widget water-heater-actions" data-thermor-actions aria-label="Actions chauffe-eau">
+    <h2>Actions</h2>
+    <p class="thermor-hint">
+      Chaque action consomme le budget d'appels partagé (2 appels/min) ; les
+      exécutions sont asynchrones, relisez l'état actuel quelques dizaines de
+      secondes plus tard.
+    </p>
+    <p class="thermor-result" data-thermor-result hidden aria-live="polite"></p>
+
+    <form class="action-bar" data-thermor-endpoint="/api/thermor/actions/absence-mode">
+      <button type="submit" data-thermor-action>Absence : activer</button>
+      <input type="hidden" name="enabled" value="true" data-json-type="bool">
+    </form>
+    <form class="action-bar" data-thermor-endpoint="/api/thermor/actions/absence-mode">
+      <button type="submit" data-thermor-action>Absence : désactiver</button>
+      <input type="hidden" name="enabled" value="false" data-json-type="bool">
+    </form>
+
+    <form class="action-bar" data-thermor-endpoint="/api/thermor/actions/target-temperature">
+      <label>Température cible (°C)
+        <input type="number" name="temperature" min="50" max="65" step="1" value="50" data-json-type="float" required>
+      </label>
+      <button type="submit" data-thermor-action>Appliquer</button>
+    </form>
+
+    <form class="action-bar" data-thermor-endpoint="/api/thermor/actions/dhw-mode">
+      <label>Mode
+        <select name="mode">
+          <option value="manualEcoInactive">Manuel (éco inactif)</option>
+          <option value="manualEcoActive">Manuel (éco actif)</option>
+          <option value="autoMode">Programme auto</option>
+        </select>
+      </label>
+      <button type="submit" data-thermor-action>Appliquer</button>
+    </form>
+
+    <form class="action-bar" data-thermor-endpoint="/api/thermor/actions/boost">
+      <label>Boost
+        <select name="enabled" data-json-type="bool">
+          <option value="false">Désactivé</option>
+          <option value="true">Activé</option>
+        </select>
+      </label>
+      <button type="submit" data-thermor-action>Appliquer</button>
+    </form>
+
+    <form class="action-bar" data-thermor-endpoint="/api/thermor/actions/anti-legionellosis">
+      <label>Anti-légionellose
+        <select name="enabled" data-json-type="bool">
+          <option value="true">Activé</option>
+          <option value="false">Désactivé</option>
+        </select>
+      </label>
+      <button type="submit" data-thermor-action>Appliquer</button>
+    </form>
+
+    <form class="action-bar" data-thermor-endpoint="/api/thermor/actions/smart-grid">
+      <label>Option smart grid
+        <select name="option">
+          <option value="deactive">Désactivée</option>
+          <option value="active">Activée</option>
+        </select>
+      </label>
+      <button type="submit" data-thermor-action>Appliquer</button>
+    </form>
+
+    <form class="action-bar" data-thermor-endpoint="/api/thermor/actions/operating-range">
+      <label>Plage de fonctionnement
+        <select name="range">
+          <option value="pac24h_elec24h">PAC 24 h / élec 24 h</option>
+          <option value="pacProg_elecProg">PAC programmé / élec programmé</option>
+        </select>
+      </label>
+      <button type="submit" data-thermor-action>Appliquer</button>
+    </form>
+
+    <form class="action-bar" data-thermor-endpoint="/api/thermor/actions/expected-showers">
+      <label>Douches attendues
+        <input type="number" name="count" min="1" max="5" step="1" value="1" data-json-type="int" required>
+      </label>
+      <button type="submit" data-thermor-action>Appliquer</button>
+    </form>
+
+    <form class="action-bar action-bar-slots" data-thermor-endpoint="/api/thermor/actions/programming-slots">
+      <label>Créneau 1
+        <input type="time" name="slot1_start" value="08:00" required> →
+        <input type="time" name="slot1_end" value="20:00" required>
+      </label>
+      <label>Créneau 2
+        <input type="time" name="slot2_start" value="00:30" required> →
+        <input type="time" name="slot2_end" value="01:30" required>
+      </label>
+      <button type="submit" data-thermor-action>Appliquer la programmation</button>
+    </form>
+
+    <form class="action-bar" data-thermor-endpoint="/api/thermor/actions/sync-clock">
+      <button type="submit" data-thermor-action>Resynchroniser l'horloge du chauffe-eau</button>
+    </form>
+  </section>
+
+  <section class="widget water-heater-schedule">
+    <h2>Planification heures creuses</h2>
+    <table class="thermor-table">
+      <thead><tr><th>Jour</th><th>Heures creuses</th></tr></thead>
+      <tbody>
+        {% for day, periods in schedule.days %}
+          <tr>
+            <td>{{ {monday: 'Lundi', tuesday: 'Mardi', wednesday: 'Mercredi', thursday: 'Jeudi', friday: 'Vendredi', saturday: 'Samedi', sunday: 'Dimanche'}[day] }}</td>
+            <td>
+              {% for period in periods %}
+                {{ period.start }}–{{ period.end }}{% if not loop.last %}, {% endif %}
+              {% endfor %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if rateLimit %}
+      <p class="thermor-hint">
+        Budget d'appels : {{ rateLimit.tokens|default('—') }} jetons,
+        backoff : {{ rateLimit.backoffUntil|default('aucun') }}.
+      </p>
+    {% endif %}
+  </section>
+
+  <section class="widget water-heater-history">
+    <h2>Historique ({{ history|length }} derniers relevés)</h2>
+    {% if history %}
+      <table class="thermor-table">
+        <thead>
+          <tr><th>Date</th><th>Température</th><th>V40</th><th>Consommation</th><th>Chauffe</th><th>Absence</th></tr>
+        </thead>
+        <tbody>
+          {% for stat in history %}
+            <tr>
+              <td>{{ stat.ts ? stat.ts|date('d/m/Y H:i') : '—' }}</td>
+              <td>{{ stat.waterTemperature is not null ? stat.waterTemperature ~ ' °C' : '—' }}</td>
+              <td>{{ stat.available40Degrees ?? '—' }} L</td>
+              <td>{{ stat.wh is not null ? (stat.wh / 1000)|round(2) ~ ' kWh' : '—' }}</td>
+              <td>{{ stat.heatingState ? 'oui' : 'non' }}</td>
+              <td>{{ stat.absenceMode ? 'oui' : 'non' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>Aucun historique enregistré.</p>
+    {% endif %}
+  </section>
+</main>
+{% endblock %}

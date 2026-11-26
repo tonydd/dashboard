@@ -12,7 +12,9 @@ Ce dépôt contient un dashboard domestique rendu côté serveur, une API Symfon
 
 ## Carte du dépôt
 
-- `symfony/src/Controller/` : pages Twig et endpoints API. Contrôleurs principaux : `DashboardController`, `AuthenticationController`, `CameraController`, `StatusController`; intégrations et données : `SolarController`, `ThermorController`, `WaterQualityController`, `FuelController`; API recettes : `RecipeController`, `IngredientsController`, `TagController`, `UnitController`; fonds d’écran : `BackgroundController`.
+- `symfony/src/Controller/` : pages Twig et endpoints API. Contrôleurs principaux : `DashboardController`, `AuthenticationController`, `CameraController`, `StatusController`; intégrations et données : `SolarController`, `ThermorController`, `WaterHeaterController` (écran
+admin `/water-heater` : état, historique et bouton barre d'actions),
+`WaterQualityController`, `FuelController`; API recettes : `RecipeController`, `IngredientsController`, `TagController`, `UnitController`; fonds d’écran : `BackgroundController`.
 - `symfony/src/Service/` : logique métier et accès aux fournisseurs externes. Garder les contrôleurs minces; y déléguer calculs, règles métier, appels externes et gestion d’état réutilisable.
 - `symfony/src/Entity/`, `Repository/`, `Enum/` : modèle Doctrine, accès aux données et types partagés. Les entités Doctrine sont exclues de l’autodéclaration de services.
 - `symfony/src/Model/` : objets de transport (par exemple `RecipeDto`).
@@ -114,5 +116,10 @@ et `ThermorService.php` :
 - Le setup local est documenté dans `docs/LOCAL_SETUP.md`. Avec Docker, `DATABASE_URL` Symfony doit utiliser l’hôte `db`; depuis l’hôte, MySQL est publié sur `127.0.0.1:33061`.
 - Ne jamais committer `.env`, `symfony/.env.local`, secrets, dumps de base ou données personnelles. `BACKGROUND_TOKEN` est une exception de visibilité à traiter avec soin : puisqu’il est ajouté à une URL d’image demandée par le navigateur, il devient visible côté client.
 - Les variables de configuration sont principalement passées par Compose puis liées dans `config/services.yaml`; lors de l’ajout d’une variable, vérifier le passage jusqu’au conteneur local et au déploiement de production, pas uniquement le code PHP.
+- **Gestion des variables d'environnement en production** : les secrets et variables d'environnement de production sont stockés dans une archive chiffrée GPG. Si une modification ou l'ajout d'une variable d'environnement en production est nécessaire, l'agent ne doit pas modifier l'archive directement mais **fournir explicitement à l'opérateur les commandes et scripts à exécuter** :
+  - `scripts/add-prod-env.sh NOM VALEUR FICHIER` (pour ajouter ou remplacer une variable dans un fichier cible, ex. `.env` ou `.env.compose.prod`).
+  - `scripts/update-prod-env.sh NOM VALEUR` (pour mettre à jour une variable existante dans tous les fichiers `.env*`).
+  - `scripts/copy-prod-env.sh SRC CIBLE VAR[=CIBLE_VAR]…` et `scripts/read-prod-env.sh NOM FICHIER` pour inspection/copie.
+  Voir `docs/PRODUCTION_DEPLOYMENT.md` pour le détail de l'archive et le déploiement via `scripts/deploy-prod.sh`.
 - Les routes API et interfaces de production doivent rester derrière HTTPS afin de protéger le cookie de session. Les ports de conteneurs de production sont en loopback et l’accès externe passe par le proxy; le chemin WebSocket caméra doit préserver l’upgrade.
 - Après une évolution, mettre à jour les tests et la documentation locale/déploiement si le démarrage, une variable d’environnement, une migration, un worker ou le proxy change.

@@ -26,6 +26,19 @@ class WaterHeaterStatRepository extends ServiceEntityRepository
         ;
     }
 
+    /**
+     * @return WaterHeaterStat[]
+     */
+    public function findRecent(int $limit = 48): array
+    {
+        return $this->createQueryBuilder('w')
+            ->orderBy('w.id', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult()
+        ;
+    }
+
     public function deleteByIds(array $ids): mixed
     {
         return $this->createQueryBuilder('w')
