@@ -22,6 +22,11 @@ class KeyValueRepository extends ServiceEntityRepository
         return $this->findOneBy(['key' => $key])?->getValue();
     }
 
+    public function getUpdatedAt(KeyValueKey $key): ?\DateTimeInterface
+    {
+        return $this->findOneBy(['key' => $key])?->getUpdatedAt();
+    }
+
     public function setValue(KeyValueKey $key, mixed $value): void
     {
         $storedKeyValue = $this->findOneBy(['key' => $key]);
@@ -30,6 +35,7 @@ class KeyValueRepository extends ServiceEntityRepository
         $keyValue = $storedKeyValue ?? (new KeyValue())->setKey($key);
 
         $keyValue->setValue($value);
+        $keyValue->setUpdatedAt(new \DateTimeImmutable());
         if ($isNew) {
             $entityManager->persist($keyValue);
         }

@@ -1,0 +1,68 @@
+{% extends 'base.html.twig' %}
+{% block title %}Statut{% endblock %}
+{% block body %}
+<main class="status-page">
+  <header class="status-header">
+    <a href="{{ path('dashboard_tablet') }}" class="status-return">← Tablette</a>
+    <h1>Statut des services</h1>
+    <span data-status-refreshed aria-live="polite"></span>
+  </header>
+
+  <section class="status-grid" data-status-cards>
+    <article class="widget" data-status-card="messenger">
+      <h2>Worker Messenger</h2>
+      <strong data-status-value>—</strong>
+      <span data-status-detail class="status-detail"></span>
+    </article>
+    <article class="widget" data-status-card="cameraWs">
+      <h2>Serveur caméra</h2>
+      <strong data-status-value>—</strong>
+      <span data-status-detail class="status-detail"></span>
+    </article>
+    <article class="widget" data-status-card="weather">
+      <h2>Météo</h2>
+      <strong data-status-value>—</strong>
+      <span data-status-detail class="status-detail"></span>
+    </article>
+  </section>
+
+  <section class="status-grid" data-status-cards>
+    {% for feed in ['solar', 'fuel', 'thermor', 'waterQuality'] %}
+    <article class="widget" data-status-card="feed-{{ feed }}">
+      <h2 data-feed-label>Solaire</h2>
+      <strong data-status-value>—</strong>
+      <span data-status-detail class="status-detail"></span>
+    </article>
+    {% endfor %}
+  </section>
+
+  <h2 class="status-section-title">Serveur</h2>
+  <section class="status-grid" data-status-cards>
+    <article class="widget" data-status-card="cpu">
+      <h2>CPU</h2>
+      <strong data-status-value>—</strong>
+      <span data-status-detail class="status-detail"></span>
+    </article>
+    <article class="widget" data-status-card="memory">
+      <h2>Mémoire</h2>
+      <strong data-status-value>—</strong>
+      <span data-status-detail class="status-detail"></span>
+    </article>
+    <article class="widget" data-status-card="swap">
+      <h2>Swap</h2>
+      <strong data-status-value>—</strong>
+      <span data-status-detail class="status-detail"></span>
+    </article>
+    <article class="widget" data-status-card="disk">
+      <h2>Disque</h2>
+      <strong data-status-value>—</strong>
+      <span data-status-detail class="status-detail"></span>
+    </article>
+    <article class="widget" data-status-card="uptime">
+      <h2>Uptime</h2>
+      <strong data-status-value>—</strong>
+      <span data-status-detail class="status-detail"></span>
+    </article>
+  </section>
+</main>
+{% endblock %}
