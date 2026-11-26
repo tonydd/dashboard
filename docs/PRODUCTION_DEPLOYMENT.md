@@ -52,7 +52,16 @@ La configuration serveur de la météo et du nom de station carburant se place d
 
 `THERMOR_API_TOKEN` est facultatif : sans cette variable, la lecture de l'état du chauffe-eau reste disponible, mais les commandes de pilotage répondent `503` jusqu'à sa configuration.
 
-Pour préparer l'archive, partir de l'archive actuelle, la déchiffrer dans un dossier temporaire sous `/dev/shm`, puis y ajouter ou remplacer `.env.compose.prod`. Copier les valeurs du modèle `.env.compose.prod.example` et renseigner les identifiants MySQL et trois ports loopback libres (`9100` pour l'API, `9101` pour le frontend et `9102` pour la signalisation caméra par défaut). `BACKGROUND_HOST_PATH` est facultatif; s'il est omis, Compose utilise `./symfony/var/backgrounds` dans le checkout de déploiement. Générer des mots de passe MySQL distincts, de préférence hexadécimaux, et ne jamais committer le fichier réel. Recréer ensuite le `tar.gz`, le chiffrer avec le même mécanisme GPG que l'archive actuelle, puis vérifier que le script `gpg --decrypt ... | tar xz` peut le lire. Ne remplacer l'archive de production qu'après cette vérification.
+Pour préparer l'archive, partir de l'archive actuelle, la déchiffrer dans un dossier temporaire sous `/dev/shm`, puis y ajouter ou remplacer `.env.compose.prod`. Copier les valeurs du modèle `.env.compose.prod.example` et renseigner les identifiants MySQL et trois ports loopback libres (`9100` pour l'API, `9101` pour le frontend et `9102` pour la signalisation caméra par défaut).
+
+Deux scripts modifient l'archive chiffrée en place (déchiffrement en RAM, vérification post-réencrypt, sauvegarde `.bak` puis remplacement atomique) :
+
+```sh
+scripts/update-prod-env.sh NOM VALEUR              # met à jour la variable dans tous les .env* où elle existe déjà
+scripts/add-prod-env.sh NOM VALEUR FICHIER         # ajoute ou met à jour la variable dans un fichier précis
+```
+
+Par exemple pour la signalisation caméra : `scripts/add-prod-env.sh CAM_WS_BIND_PORT 9102 .env.compose.prod`. Les deux scripts détectent le mode GPG de l'archive (clé publique ou symétrique) et le conservent au réencrypt. `BACKGROUND_HOST_PATH` est facultatif; s'il est omis, Compose utilise `./symfony/var/backgrounds` dans le checkout de déploiement. Générer des mots de passe MySQL distincts, de préférence hexadécimaux, et ne jamais committer le fichier réel. Recréer ensuite le `tar.gz`, le chiffrer avec le même mécanisme GPG que l'archive actuelle, puis vérifier que le script `gpg --decrypt ... | tar xz` peut le lire. Ne remplacer l'archive de production qu'après cette vérification.
 
 Le backend utilise toujours `BACKGROUND_PATH` pour servir le fond d'écran quotidien via `/api/background`. Si aucun fichier `.jpg` n'est présent dans le dossier monté, le déploiement ne bloque plus, mais cette route ne pourra pas fournir d'image.
 
