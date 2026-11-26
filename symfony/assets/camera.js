@@ -9,7 +9,8 @@ const logClientFailure = (action, error) => {
 };
 
 function cameraSocketUrl() {
-  const configured = document.querySelector('meta[name="camera-ws-url"]')?.content;
+  // {host} is substituted client-side so LAN devices reach the signaling server too.
+  const configured = document.querySelector('meta[name="camera-ws-url"]')?.content.replace('{host}', window.location.hostname);
   if (configured) return configured;
   const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${scheme}//${window.location.host}/camera-ws`;
@@ -218,6 +219,8 @@ function initCameraPublisher() {
   });
 
   connect();
+  // Sharing starts on its own when the tablet page loads; the toggle only stops/resumes it.
+  toggle.click();
 }
 
 // ---------------------------------------------------------------------------

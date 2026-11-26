@@ -38,7 +38,7 @@ L'écran tablette expose sa caméra WebRTC via un serveur de signalisation WebSo
 
 Authentification WebSocket : `/api/camera/token` (session + CSRF, rôle `ROLE_VIEWER`) délivre un jeton HMAC courte durée qui autorise une connexion de signalisation en tant que `publisher` (tablette) ou `viewer` (page caméra). Une seule tablette peut publier à la fois.
 
-Développement : le service `webcam-ws` écoute sur `ws://localhost:8081` (option `CAMERA_WS_URL` du `.env` pour le forcer). En production, la route `/camera-ws` est routée par Caddy vers ce service ; le reverse proxy externe doit donc transmettre l'upgrade WebSocket (`Upgrade`/`Connection`) sans tampon de réponse pour ce chemin.
+Développement : le service `webcam-ws` écoute sur le port hôte 8081 et l'URL injectée par défaut dans les pages est `ws://{host}:8081` (`{host}` est remplacé par le nom d'hôte courant, ce qui fonctionne aussi depuis un autre appareil du réseau). En production, la route `/camera-ws` est routée par Caddy vers ce service ; le reverse proxy externe doit donc transmettre l'upgrade WebSocket (`Upgrade`/`Connection`) sans tampon de réponse pour ce chemin.
 - Le mot de passe est demandé de façon interactive et son hash est conservé en base ; aucun mot de passe n'est configuré dans le front.
 - Le compte tablette est en lecture seule ; les routes de création, modification et suppression sont réservées au rôle `ROLE_ADMIN`.
 - Le délai de retour automatique tablette → diaporama se règle via `POST /api/dashboard/settings/slideshow-return` avec `{"seconds": 900}`, un compte `ROLE_ADMIN` et le jeton CSRF de `/api/session`. Valeurs autorisées : 60 à 86 400 secondes; défaut : 900 secondes.

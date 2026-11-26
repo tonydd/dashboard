@@ -20,7 +20,7 @@ services:
       OPENWEATHERMAP_UNITS: "${OPENWEATHERMAP_UNITS:-${VITE_OPENWEATHERMAP_UNITS:-metric}}"
       OPENWEATHERMAP_LANG: "${OPENWEATHERMAP_LANG:-${VITE_OPENWEATHERMAP_LANG:-fr}}"
       FUEL_API_STATION_NAME: "${FUEL_API_STATION_NAME:-${VITE_FUEL_API_STATION_NAME:-}}"
-      CAMERA_WS_URL: ${CAMERA_WS_URL:-}
+      CAMERA_WS_URL: ${CAMERA_WS_URL:-ws://{host}:8081}
     command: sh -c "cd /var/www/html && composer install --no-interaction --prefer-dist && php -S 0.0.0.0:80 -t public"
     ports:
       - "8000:80"
