@@ -107,7 +107,7 @@ compose run --rm --no-deps --user www-data php \
     --no-interaction --allow-no-migration --env=prod
 
 echo "=== Démarrage des services applicatifs ==="
-compose up -d php web scheduler
+compose up -d php web scheduler webcam-ws
 compose exec --user www-data --no-TTY php php bin/console about --env=prod
 
 echo

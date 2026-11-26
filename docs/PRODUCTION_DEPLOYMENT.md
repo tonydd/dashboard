@@ -104,5 +104,5 @@ Les commandes Compose utilisent le nom de projet fixe `dashboard-prod` afin de c
 
 ```sh
 docker compose -p dashboard-prod --env-file /dev/shm/.../.env.compose.prod -f compose.prod.yml ps
-docker compose -p dashboard-prod --env-file /dev/shm/.../.env.compose.prod -f compose.prod.yml logs -f web php scheduler database
+docker compose -p dashboard-prod --env-file /dev/shm/.../.env.compose.prod -f compose.prod.yml logs -f web php scheduler webcam-ws database
 ```
