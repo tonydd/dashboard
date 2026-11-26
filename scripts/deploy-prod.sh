@@ -40,11 +40,22 @@ do
     fi
 done
 
+# Docker Compose interpolates $ in env_file values ($$ -> literal $), so a
+# value containing a literal $ must be escaped once before compose reads it.
+# The archive keeps the true values; escape the extracted copies in place.
+# shellcheck disable=SC2016
+sed -i 's/\$/\$\$/g' "${SECRETS_DIR}/.env"
+
 export SYMFONY_ENV_FILE="${SECRETS_DIR}/.env"
 if [[ -f "${SECRETS_DIR}/.env.production.vue" ]]; then
-    export DASHBOARD_ENV_FILE="${SECRETS_DIR}/.env.production.vue"
+    DASHBOARD_ENV_FILE="${SECRETS_DIR}/.env.production.vue"
 elif [[ -f "${SECRETS_DIR}/.env.vue" ]]; then
-    export DASHBOARD_ENV_FILE="${SECRETS_DIR}/.env.vue"
+    DASHBOARD_ENV_FILE="${SECRETS_DIR}/.env.vue"
+fi
+if [[ -n "${DASHBOARD_ENV_FILE:-}" ]]; then
+    # shellcheck disable=SC2016
+    sed -i 's/\$/\$\$/g' "${DASHBOARD_ENV_FILE}"
+    export DASHBOARD_ENV_FILE
 fi
 
 echo "=== Clone du dépôt (branche ${BRANCH}) ==="
