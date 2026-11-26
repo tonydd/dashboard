@@ -51,7 +51,11 @@ WORKDIR /var/www/html
 COPY --from=app-build --chown=www-data:www-data /var/www/html /var/www/html
 RUN mkdir -p var/cache var/log \
     && touch .env \
-    && chown -R www-data:www-data var
+    && chown -R www-data:www-data var \
+    # AssetMapper serves files at runtime only in dev: dump the compiled
+    # assets into public/assets for production.
+    && php bin/console asset-map:compile \
+    && chown -R www-data:www-data public/assets
 
 EXPOSE 80
 CMD ["apache2-foreground"]
