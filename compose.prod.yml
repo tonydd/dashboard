@@ -30,6 +30,7 @@ services:
       - "127.0.0.1:${PHP_BIND_PORT:-9100}:80"
     env_file:
       - ${SYMFONY_ENV_FILE:?Set SYMFONY_ENV_FILE to the decrypted Symfony env file}
+      - ${DASHBOARD_ENV_FILE:-/dev/null}
     environment: &app_environment
       APP_ENV: prod
       APP_DEBUG: "0"

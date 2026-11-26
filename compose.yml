@@ -1,20 +1,4 @@
 services:
-  frontend:
-    image: node:20
-    container_name: app_frontend
-    working_dir: /app
-    volumes:
-      - .:/app
-    command: sh -c "npm install && npm run dev"
-    ports:
-      - "5174:5174" # Vite
-    environment:
-      - HOST=0.0.0.0
-      - VITE_API_PROXY_TARGET=http://php:80
-    depends_on:
-      php:
-        condition: service_started
-
   php:
     build:
       context: Docker/php
@@ -26,8 +10,16 @@ services:
     working_dir: /var/www/html/public
     environment:
       BACKGROUND_PATH: ${BACKGROUND_PATH:-/srv/backgrounds}
+      BACKGROUND_TOKEN: ${BACKGROUND_TOKEN:-${VITE_BACKGROUND_TOKEN:-}}
       APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Paris}
       THERMOR_API_TOKEN: ${THERMOR_API_TOKEN:-}
+      OPENWEATHERMAP_API_URL: "${OPENWEATHERMAP_API_URL:-${VITE_OPENWEATHERMAP_API_URL:-https://api.openweathermap.org/data/3.0/onecall}}"
+      OPENWEATHERMAP_API_KEY: "${OPENWEATHERMAP_API_KEY:-${VITE_OPENWEATHERMAP_API_KEY:-}}"
+      OPENWEATHERMAP_LAT: "${OPENWEATHERMAP_LAT:-${VITE_OPENWEATHERMAP_LAT:-}}"
+      OPENWEATHERMAP_LON: "${OPENWEATHERMAP_LON:-${VITE_OPENWEATHERMAP_LON:-}}"
+      OPENWEATHERMAP_UNITS: "${OPENWEATHERMAP_UNITS:-${VITE_OPENWEATHERMAP_UNITS:-metric}}"
+      OPENWEATHERMAP_LANG: "${OPENWEATHERMAP_LANG:-${VITE_OPENWEATHERMAP_LANG:-fr}}"
+      FUEL_API_STATION_NAME: "${FUEL_API_STATION_NAME:-${VITE_FUEL_API_STATION_NAME:-}}"
     command: sh -c "cd /var/www/html && composer install --no-interaction --prefer-dist && php -S 0.0.0.0:80 -t public"
     ports:
       - "8000:80"

@@ -1,0 +1,17 @@
+{% extends 'base.html.twig' %}
+{% block title %}Diaporama{% endblock %}
+{% block body %}
+<main class="slideshow-page">
+  <a class="slideshow-target" href="{{ path('dashboard_tablet') }}" aria-label="Afficher la tablette"></a>
+  <img
+    class="slideshow-image"
+    src="https://dendrijver.duckdns.org/random-image/random?{% if backgroundToken %}token={{ backgroundToken|url_encode }}&amp;{% endif %}timestamp={{ 'now'|date('Uv') }}"
+    alt=""
+    referrerpolicy="no-referrer"
+  >
+  <a class="slideshow-clock" href="{{ path('dashboard_tablet') }}" data-drag-clock>
+    <div data-clock-date></div>
+    <strong data-clock-time></strong>
+  </a>
+</main>
+{% endblock %}

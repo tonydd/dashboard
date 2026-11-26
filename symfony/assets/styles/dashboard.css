@@ -1,0 +1,479 @@
+:root {
+  color-scheme: dark;
+  font-family: Arial, sans-serif;
+  background: #101820;
+  color: #f4f0e9;
+  --panel: #233542;
+  --panel-border: #405563;
+  --accent: #f2b36f;
+  --accent-cool: #93d6c6;
+  --muted: #b6c4ca;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  margin: 0;
+  background: #101820;
+  color: #f4f0e9;
+}
+
+.login-screen {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.login-card {
+  display: grid;
+  gap: 16px;
+  width: min(420px, 100%);
+  padding: 28px;
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  background: var(--panel);
+}
+
+.login-card input,
+.login-card button {
+  min-height: 48px;
+  font-size: 18px;
+}
+
+.login-card button {
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #20170d;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.tablet-page {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto auto minmax(0, 1fr) minmax(0, 1.3fr);
+  gap: 14px;
+  width: min(1280px, 100vw, 160vh);
+  height: min(800px, 100vh, 62.5vw);
+  aspect-ratio: 8 / 5;
+  padding: 22px;
+  overflow: hidden;
+  background: #17232d;
+}
+
+.tablet-clock {
+  display: grid;
+  align-content: center;
+  text-align: center;
+}
+
+.clock-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.clock-date {
+  color: var(--muted);
+  font-size: clamp(18px, 2.2vw, 28px);
+  letter-spacing: 0.03em;
+}
+
+.clock-time {
+  color: var(--accent);
+  font-size: clamp(42px, 5.2vw, 68px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.timers {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+}
+
+.timer {
+  min-width: 180px;
+  min-height: 76px;
+  padding: 10px 24px;
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  background: #2b414e;
+  color: #f4f0e9;
+  cursor: pointer;
+  font-size: 20px;
+}
+
+.timer strong {
+  color: var(--accent-cool);
+  font-variant-numeric: tabular-nums;
+}
+
+.timer-name {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--muted);
+  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  min-height: 0;
+}
+
+.fuel-news {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 14px;
+  min-height: 0;
+}
+
+.widget {
+  min-width: 0;
+  padding: 16px 18px;
+  overflow: auto;
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 5px 14px rgb(0 0 0 / 14%);
+}
+
+.widget h2 {
+  margin: 0 0 10px;
+  color: var(--accent);
+  font-size: 17px;
+  letter-spacing: 0.04em;
+}
+
+.status-grid .widget {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+.status-grid .widget strong {
+  color: var(--accent-cool);
+  font-size: clamp(24px, 3vw, 36px);
+  font-variant-numeric: tabular-nums;
+}
+
+.weather {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  min-height: 58px;
+  width: 100%;
+  border: 1px solid var(--panel-border);
+  font: inherit;
+  color: var(--muted);
+  text-align: center;
+  cursor: pointer;
+}
+
+.weather strong {
+  color: var(--accent-cool);
+  font-size: 28px;
+}
+
+.fuel-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid #405563;
+}
+
+.fuel-row strong {
+  color: var(--accent-cool);
+}
+
+.widget a {
+  display: block;
+  padding: 7px 0;
+  color: #d7eee8;
+  text-decoration-color: #709b90;
+}
+
+.widget-error {
+  display: block;
+  padding-top: 6px;
+  color: #ffd08a;
+  font-size: 14px;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.timer-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.timer-presets button,
+#timer-form menu button {
+  min-height: 44px;
+}
+
+dialog {
+  width: min(720px, calc(100% - 32px));
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  background: var(--panel);
+  color: #f4f0e9;
+}
+
+dialog::backdrop {
+  background: rgb(0 0 0 / 75%);
+}
+
+.weather-dialog {
+  max-width: 900px;
+  max-height: min(760px, calc(100vh - 32px));
+  padding: 0;
+  overflow: hidden;
+}
+
+.weather-dialog[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.weather-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.weather-dialog-header h2 {
+  margin: 0;
+  color: var(--accent);
+  font-size: 19px;
+}
+
+.weather-dialog-header button {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #20170d;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.weather-forecast {
+  overflow-y: auto;
+  padding: 10px 18px;
+}
+
+.weather-day {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.5fr) 64px minmax(130px, 1fr) minmax(140px, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.weather-day img {
+  width: 60px;
+  height: 60px;
+}
+
+.weather-day h3,
+.weather-day p {
+  margin: 0;
+}
+
+.weather-day h3 {
+  text-transform: capitalize;
+}
+
+.weather-day-heading p {
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.weather-day-temperatures {
+  color: var(--accent-cool);
+  font-weight: 700;
+}
+
+.news-dialog {
+  display: none;
+  width: min(1120px, calc(100vw - 32px));
+  height: min(700px, calc(100vh - 32px));
+  max-width: 1120px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.news-dialog[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.news-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.news-dialog-header h2 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--accent);
+  font-size: 19px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.news-dialog-header form {
+  flex: 0 0 auto;
+}
+
+.news-dialog-header button {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #20170d;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.news-dialog iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
+}
+
+.news-dialog-fallback {
+  margin: 0;
+  padding: 9px 18px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.news-dialog-fallback a {
+  color: #d7eee8;
+}
+
+#timer-form {
+  display: grid;
+  gap: 16px;
+}
+
+#timer-form menu {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.slideshow-page {
+  position: relative;
+  width: min(1280px, 100vw, 160vh);
+  height: min(800px, 100vh, 62.5vw);
+  aspect-ratio: 8 / 5;
+  overflow: hidden;
+  background: #101820;
+}
+
+.slideshow-target {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+}
+
+.slideshow-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.slideshow-clock {
+  position: absolute;
+  z-index: 2;
+  min-width: 260px;
+  padding: 18px;
+  border: 1px solid rgb(255 255 255 / 24%);
+  border-radius: 14px;
+  background: rgb(16 24 32 / 78%);
+  color: #fff;
+  text-align: center;
+  text-decoration: none;
+  touch-action: none;
+  cursor: grab;
+}
+
+.slideshow-clock strong {
+  display: block;
+  color: var(--accent);
+  font-size: 50px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 700px), (orientation: portrait) {
+  .tablet-page {
+    grid-template-rows: auto auto auto auto auto;
+    overflow: auto;
+  }
+
+  .status-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .fuel-news {
+    grid-template-columns: 1fr;
+  }
+
+  .timer {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .weather {
+    flex-wrap: wrap;
+  }
+
+  .weather-day {
+    grid-template-columns: minmax(110px, 1fr) 52px minmax(100px, 1fr);
+    gap: 8px;
+  }
+
+  .weather-day img {
+    width: 48px;
+    height: 48px;
+  }
+
+  .weather-day > p:last-child {
+    grid-column: 1 / -1;
+  }
+}
