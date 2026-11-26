@@ -22,6 +22,9 @@ class KeyValue
     #[ORM\Column(type: Types::JSON, nullable: true)]
     private mixed $value = null;
 
+    #[ORM\Column(name: 'updated_at', type: Types::DATETIME_MUTABLE, nullable: true)]
+    private ?\DateTimeInterface $updatedAt = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -47,6 +50,18 @@ class KeyValue
     public function setValue(mixed $value): static
     {
         $this->value = $value;
+
+        return $this;
+    }
+
+    public function getUpdatedAt(): ?\DateTimeInterface
+    {
+        return $this->updatedAt;
+    }
+
+    public function setUpdatedAt(\DateTimeInterface $updatedAt): static
+    {
+        $this->updatedAt = $updatedAt;
 
         return $this;
     }

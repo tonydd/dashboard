@@ -43,6 +43,10 @@ parameters:
     openWeatherLang: '%env(default:openWeatherLangLegacy:OPENWEATHERMAP_LANG)%'
     fuelStationNameLegacy: '%env(default:openWeatherApiKeyDefault:VITE_FUEL_API_STATION_NAME)%'
     fuelStationName: '%env(default:fuelStationNameLegacy:FUEL_API_STATION_NAME)%'
+    cameraWsInternalHostDefault: 'webcam-ws'
+    cameraWsInternalHost: '%env(default:cameraWsInternalHostDefault:CAMERA_WS_INTERNAL_HOST)%'
+    cameraWsInternalPortDefault: 8080
+    cameraWsInternalPort: '%env(int:default:cameraWsInternalPortDefault:CAMERA_WS_INTERNAL_PORT)%'
 
 services:
     # default configuration for services in *this* file
@@ -74,6 +78,8 @@ services:
             $openWeatherUnits: '%openWeatherUnits%'
             $openWeatherLang: '%openWeatherLang%'
             $fuelStationName: '%fuelStationName%'
+            $cameraWsInternalHost: '%cameraWsInternalHost%'
+            $cameraWsInternalPort: '%cameraWsInternalPort%'
             $appSecret: '%env(APP_SECRET)%'
 
     # Automatically injects dependencies in your services.

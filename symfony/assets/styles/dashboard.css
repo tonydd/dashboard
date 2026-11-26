@@ -571,3 +571,88 @@ dialog::backdrop {
   cursor: not-allowed;
 }
 
+
+/* ------------------------------- Status page ------------------------------ */
+
+.status-page {
+  display: grid;
+  gap: 20px;
+  width: min(900px, 100%);
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.status-header {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.status-header h1 {
+  flex: 1;
+  margin: 0;
+  font-size: 22px;
+}
+
+.status-header [data-status-refreshed] {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.status-return {
+  color: var(--accent-cool);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.status-return:hover {
+  text-decoration: underline;
+}
+
+.status-section-title {
+  margin: 4px 0 0;
+  font-size: 16px;
+  color: var(--muted);
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+[data-status-card] {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+[data-status-card] h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+[data-status-card] .status-detail {
+  color: var(--muted);
+  font-size: 12px;
+  min-height: 1em;
+}
+
+[data-status-card][data-status-state='ok'] [data-status-value]::before {
+  content: '● ';
+  color: #4caf50;
+}
+
+[data-status-card][data-status-state='stale'] [data-status-value]::before {
+  content: '● ';
+  color: #e06c5a;
+}
+
+[data-status-card][data-status-state='stale'] {
+  border-color: #8a4438;
+}
