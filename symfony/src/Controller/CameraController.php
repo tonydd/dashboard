@@ -28,6 +28,16 @@ class CameraController extends AbstractController
         return $this->render('dashboard/camera.html.twig');
     }
 
+    #[Route('/camera-node', name: 'dashboard_camera_node', methods: ['GET'])]
+    public function cameraNode(): Response
+    {
+        if (!$this->getUser()) {
+            return $this->render('dashboard/login.html.twig');
+        }
+
+        return $this->render('dashboard/camera_node.html.twig');
+    }
+
     #[Route('/api/camera/token', name: 'api_camera_token', methods: ['POST'])]
     #[IsGranted('ROLE_VIEWER')]
     #[IsCsrfTokenValid('api', tokenKey: 'X-CSRF-Token', tokenSource: IsCsrfTokenValid::SOURCE_HEADER)]

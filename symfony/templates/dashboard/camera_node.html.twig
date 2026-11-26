@@ -1,0 +1,18 @@
+{% extends 'base.html.twig' %}
+{% block title %}Caméra{% endblock %}
+{% block manifest %}<link rel="manifest" href="/manifest-camera-node.json">{% endblock %}
+{% block body %}
+<main class="camera-node-page" data-camera-node>
+  <section class="camera-node-status" aria-live="polite">
+    <div class="camera-node-item">
+      <span>Caméra</span>
+      <strong data-camera-label data-camera-state="off">OFF</strong>
+    </div>
+    <div class="camera-node-item">
+      <span>WS</span>
+      <strong data-ws-state="off">—</strong>
+    </div>
+  </section>
+  <p class="camera-node-name" data-camera-node-name></p>
+</main>
+{% endblock %}

@@ -656,3 +656,59 @@ dialog::backdrop {
 [data-status-card][data-status-state='stale'] {
   border-color: #8a4438;
 }
+
+/* Camera node (/camera-node): old Android phones dedicated to publishing
+   their camera; only the sharing status is shown, never a preview. */
+.camera-node-page {
+  display: grid;
+  place-content: center;
+  gap: 24px;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.camera-node-status {
+  display: grid;
+  gap: 32px;
+  justify-items: center;
+  padding: 40px 56px;
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  background: var(--panel);
+}
+
+.camera-node-item {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  font-size: clamp(28px, 7vw, 48px);
+}
+
+.camera-node-item span {
+  color: var(--muted);
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.camera-node-item strong {
+  font-size: 1.5em;
+  line-height: 1;
+}
+
+.camera-node-item strong[data-camera-state='on'],
+.camera-node-item strong[data-ws-state='on'] {
+  color: #4caf50;
+}
+
+.camera-node-item strong[data-camera-state='ko'],
+.camera-node-item strong[data-ws-state='off'] {
+  color: #e06c5a;
+}
+
+.camera-node-name {
+  margin: 0;
+  color: var(--muted);
+  font-size: 16px;
+  text-align: center;
+}

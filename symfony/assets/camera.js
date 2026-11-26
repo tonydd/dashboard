@@ -3,6 +3,7 @@ const ICE_SERVERS = [
 ];
 
 const CONNECTION_RETRY_DELAY_MS = 3000;
+const CAMERA_RETRY_DELAY_MS = 5000;
 const HEALTHCHECK_INTERVAL_MS = 5000;
 
 const logClientFailure = (action, error) => {
@@ -69,10 +70,30 @@ function cameraClientName() {
   }
   const stored = localStorage.getItem('camera-client-name');
   if (stored) return stored;
-  const generated = `Tablette-${Math.random().toString(36).slice(2, 6)}`;
+  const generated = `${document.querySelector('[data-camera-node]') ? 'Cam' : 'Tablette'}-${Math.random().toString(36).slice(2, 6)}`;
   localStorage.setItem('camera-client-name', generated);
 
   return generated;
+}
+
+/**
+ * Facing mode of the camera to share, persisted like the client name.
+ * `/camera-node?facing=user` switches a node to its front camera; camera
+ * nodes default to the rear camera (wall-mounted phones), tablets to the front.
+ */
+function cameraFacingMode() {
+  const requested = new URLSearchParams(window.location.search).get('facing');
+  if (requested === 'user' || requested === 'environment') {
+    localStorage.setItem('camera-facing-mode', requested);
+
+    return requested;
+  }
+  const stored = localStorage.getItem('camera-facing-mode');
+  if (stored === 'user' || stored === 'environment') return stored;
+  const fallback = document.querySelector('[data-camera-node]') ? 'environment' : 'user';
+  localStorage.setItem('camera-facing-mode', fallback);
+
+  return fallback;
 }
 
 // ---------------------------------------------------------------------------
@@ -86,9 +107,13 @@ function initCameraPublisher() {
   // sharing survives the tablet -> slideshow page switch; going back to
   // /tablet re-registers under the same name and evicts this session.
   const headless = Boolean(document.querySelector('[data-camera-publish]'));
-  if (!toggle && !headless) return;
+  // Dedicated camera-node page (/camera-node): old Android phones that exist
+  // only to publish their camera, with no user interaction and no preview.
+  const node = Boolean(document.querySelector('[data-camera-node]'));
+  if (!toggle && !headless && !node) return;
 
-  const label = toggle?.querySelector('[data-camera-label]') ?? toggle;
+  const label = toggle?.querySelector('[data-camera-label]') ?? document.querySelector('[data-camera-label]') ?? toggle;
+  const wsLabel = document.querySelector('[data-ws-state]');
   // Without a strong reference the browser may garbage-collect the socket and
   // silently drop the signaling connection seconds after registering.
   let socket = null;
@@ -96,6 +121,7 @@ function initCameraPublisher() {
   let socketState = 'off';
   let sessionExpired = false;
   let retryTimer = null;
+  let cameraRetryTimer = null;
   // viewerId -> RTCPeerConnection, or null while waiting for the camera to be ON.
   const viewers = new Map();
 
@@ -110,10 +136,21 @@ function initCameraPublisher() {
   };
 
   const setToggleState = (state) => {
-    if (!toggle) return;
-    toggle.dataset.cameraState = state;
-    label.textContent = state === 'on' ? 'ON' : 'OFF';
+    if (toggle) toggle.dataset.cameraState = state;
+    if (label) {
+      label.textContent = state === 'on' ? 'ON' : 'OFF';
+      if (node) label.dataset.cameraState = state;
+    }
   };
+
+  const setWsState = (state, text) => {
+    if (!wsLabel) return;
+    wsLabel.dataset.wsState = state;
+    wsLabel.textContent = text;
+  };
+
+  const nameEl = document.querySelector('[data-camera-node-name]');
+  if (nameEl) nameEl.textContent = cameraClientName();
 
   const closePeerFor = (viewerId) => {
     const peer = viewers.get(viewerId);
@@ -160,6 +197,7 @@ function initCameraPublisher() {
     switch (message.type) {
       case 'registered':
         socketState = 'open';
+        setWsState('on', 'connecté');
         // Re-announce the camera state; the server hands back any viewer
         // still bound to us (signaling server restart or page reload).
         sendStatus();
@@ -167,6 +205,9 @@ function initCameraPublisher() {
           if (!viewers.has(viewerId)) viewers.set(viewerId, null);
           if (mediaStream) createPeerAndOffer(viewerId);
         });
+        // Camera nodes keep publishing: the phone may have dropped the
+        // camera (sleep, permission prompt) while the socket was down.
+        if (node && !mediaStream) activateSharing();
         break;
       case 'evicted': {
         // Another page registered under the same name; stop sharing and let
@@ -210,11 +251,13 @@ function initCameraPublisher() {
   const connect = () => {
     if (sessionExpired || socketState === 'open' || socketState === 'connecting') return;
     socketState = 'connecting';
+    setWsState('connecting', 'connexion…');
     openCameraSocket('publisher', onMessage, { name: cameraClientName() })
       .then((connection) => {
         socket = connection;
         socket.onclose = () => {
           socketState = 'closed';
+          setWsState('off', 'déconnecté');
           // The server dropped our registration with it; the user re-enables ON if needed.
           if (mediaStream) {
             mediaStream.getTracks().forEach((track) => track.stop());
@@ -227,9 +270,10 @@ function initCameraPublisher() {
       })
       .catch((error) => {
         socketState = 'closed';
+        setWsState('off', 'déconnecté');
         logClientFailure('Camera publisher connect', error);
         if (error instanceof Error && error.message.includes('Session expirée')) {
-          window.location.replace('/tablet');
+          window.location.replace(node ? '/camera-node' : '/tablet');
           sessionExpired = true;
 
           return;
@@ -246,19 +290,34 @@ function initCameraPublisher() {
     }, CONNECTION_RETRY_DELAY_MS);
   };
 
+  // Camera nodes retry activation on their own: a freshly reset phone or a
+  // still-pending permission prompt must not leave the camera down forever.
+  const scheduleCameraRetry = () => {
+    if (!node || cameraRetryTimer || sessionExpired) return;
+    cameraRetryTimer = setTimeout(() => {
+      cameraRetryTimer = null;
+      activateSharing();
+    }, CAMERA_RETRY_DELAY_MS);
+  };
+
   const activateSharing = async () => {
     if (mediaStream) return;
 
     try {
       mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: false,
-        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: { facingMode: cameraFacingMode(), width: { ideal: 1280 }, height: { ideal: 720 } },
       });
     } catch (error) {
       logClientFailure('Camera activation', error);
       if (label) {
         label.textContent = 'KO';
-        setTimeout(() => setToggleState('off'), 2000);
+        if (node) {
+          label.dataset.cameraState = 'ko';
+          scheduleCameraRetry();
+        } else {
+          setTimeout(() => setToggleState('off'), 2000);
+        }
       }
 
       return;
