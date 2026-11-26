@@ -9,6 +9,7 @@ enum KeyValueKey: string
     case Thermor = 'thermor';
     case ThermorSchedule = 'thermor_schedule';
     case ThermorScheduleState = 'thermor_schedule_state';
+    case ThermorApiRateLimit = 'thermor_api_rate_limit';
 
     case WaterQuality = 'water_quality';
     case Background = 'day_image';
