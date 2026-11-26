@@ -98,7 +98,13 @@ if (loginForm) {
       if (!sessionResponse.ok) throw new Error('Impossible de vérifier la session.');
       const session = await sessionResponse.json();
       if (session.authenticated !== true) throw new Error("La session n'a pas été établie.");
-      window.location.replace('/tablet');
+      // Send the user back to the page they asked for before being shown
+      // the login form; only same-origin relative URLs are accepted.
+      const requested = document.querySelector('[data-login-redirect]')?.value ?? '';
+      const safePath = requested.startsWith('/') && !requested.startsWith('//') && !requested.startsWith('/\\')
+        ? requested
+        : '/tablet';
+      window.location.replace(safePath);
     } catch (err) {
       logClientFailure('Dashboard login', err);
       error.textContent = err instanceof Error ? err.message : 'Connexion impossible.';

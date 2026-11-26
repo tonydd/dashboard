@@ -23,6 +23,15 @@ final class DashboardControllerTest extends WebTestCase
         self::assertSelectorExists('#dashboard-login');
     }
 
+    public function testLoginPageCarriesTheRequestedPathForThePostLoginRedirect(): void
+    {
+        $client = static::createClient();
+
+        $client->request('GET', '/slideshow?name=cuisine');
+        self::assertSelectorExists('#dashboard-login');
+        self::assertInputValueSame('redirect', '/slideshow?name=cuisine');
+    }
+
     public function testCameraTokenRequiresAnAuthenticatedSession(): void
     {
         $client = static::createClient();
