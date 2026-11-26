@@ -71,6 +71,44 @@ Ce dépôt contient un dashboard domestique rendu côté serveur, une API Symfon
 - Diagnostic utile : `cd symfony && php bin/console debug:router`, `php bin/console about`. Vérifier une route, pas seulement son action, quand l’API change.
 - La suite existante couvre les contrôleurs Dashboard, Authentication, Camera, Status et Thermor, plusieurs services et `KeyValueRepository`. Il n’y a pas de test frontend dédié ni de test de contrôleur recette actuellement; ajouter une couverture ciblée lorsqu’on modifie ces surfaces.
 
+## Intégration Thermor / Overkiz (chauffe-eau) — limites d’appels
+
+Le chauffe-eau passe par trois nuages en chaîne (Atlantic → Magellan →
+Overkiz) et leurs quotas ne sont pas documentés ; un dépassement peut
+entraîner un blocage de plusieurs heures du compte. Toutes les règles
+ci-dessous sont implémentées dans `symfony/src/Service/ThermorApiRateLimiter.php`
+et `ThermorService.php` :
+
+- **Tout appel HTTP sortant** vers Atlantic/Magellan/Overkiz doit passer par
+  `ThermorApiRateLimiter::acquire()` (bucket de jetons persisté dans la table
+  `key_value`, clé `ThermorApiRateLimit`) : régime soutenu max **2 appels/min**
+  (1 jeton/30 s), rafale max **10 appels**, partagé entre tous les consommateurs
+  (scheduler, requêtes web, sondes manuelles).
+- Un 429 ou `errorCode: QUOTA_EXCEEDED` déclenche `penalize()` : backoff
+  exponentiel **60 s → 30 min** bloquant tous les sites d’appel ; il est levé
+  par le prochain succès (`recordSuccess()`).
+- Le polling planifié (`ThermorMessage`, `ScheduleProvider`) s’appuie sur le
+  cache du setup (`SETUP_CACHE_TTL` ≈ 55 s) : plusieurs consommateurs sur une
+  même minute partagent un seul appel `/setup`. Ne jamais rafraîchir plus vite
+  que ce TTL et ne jamais désactiver ce cache.
+- La session Overkiz (JSESSIONID) coûte 3 appels (token Atlantic, token
+  Magellan, login Overkiz) et vit 30 min : la réutiliser via le cache plutôt
+  que se reconnecter. En cas d’erreur de session, une seule reconnexion puis
+  un seul retry (voir `fetchSetup()`).
+- Les commandes vers le chauffe-eau passent par `exec/apply` ; chaque appel
+  peut porter **plusieurs commandes** (batch) : regrouper les `refresh*` au
+  lieu d’émettre un appel par commande. Les commandes `refresh*` demandent à
+  la gateway de relire l’appareil en Modbus et de pousser les états vers le
+  cloud (utile car l’appareil ne pousse pas de lui-même plus souvent que
+  ~10 min) ; les résultats sont asynchrones (laisser ~20-30 s avant de relire
+  `/setup`).
+- Pour du débogage ou de l’exploration manuelle de l’API : écrire un script
+  temporaire réutilisant `ThermorApiRateLimiter` (session/identifiants dans
+  `symfony/.env`, jamais committés), **sauvegarder chaque réponse dans un
+  fichier temporaire** sous `symfony/var/` (non versionné) et réanalyser les
+  fichiers locaux au lieu de refaire des appels. Ne jamais relancer un script
+  de sonde sans revoir d’abord les réponses déjà enregistrées.
+
 ## Configuration et précautions opérationnelles
 
 - Le setup local est documenté dans `docs/LOCAL_SETUP.md`. Avec Docker, `DATABASE_URL` Symfony doit utiliser l’hôte `db`; depuis l’hôte, MySQL est publié sur `127.0.0.1:33061`.

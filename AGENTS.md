@@ -2,6 +2,13 @@
 
 Notes for coding agents working in this repository.
 
+## Required reading
+
+- At the start of every session, read
+  `.github/copilot-instructions.md` before making any change. It is the
+  authoritative project guide (stack, conventions, tests, operational
+  precautions) and is not loaded automatically.
+
 ## Architecture conventions
 
 - **Key-value storage**: application state that is not a business entity
